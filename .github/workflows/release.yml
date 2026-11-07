@@ -1,0 +1,62 @@
+# Builds the portable Windows editor and publishes a release when a version tag (v1.2.3) is pushed,
+# or by hand: Actions -> Release -> Run workflow, with the version.
+#
+# The runtime (Python + modules, ~70 MB) has its own release "runtime-<hash>", made only when
+# portable/requirements.txt or the Python version change; later releases reuse it, so players
+# download it only then. Every release has: the full zip (first download), the code zip (updates)
+# and version.json (what update.py checks).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, e.g. 1.0.1"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Version
+        id: v
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then V="${{ github.event.inputs.version }}"; else V="${GITHUB_REF_NAME}"; fi
+          V="${V#v}"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "runtime=$(python portable/build.py --print-runtime)" >> "$GITHUB_OUTPUT"
+      - name: Reuse the runtime if it is released already
+        id: rt
+        run: |
+          RT="${{ steps.v.outputs.runtime }}"
+          if gh release download "runtime-$RT" -p "tw-editor-runtime-$RT-win64.zip" -D prev; then
+            echo "args=--runtime-zip prev/tw-editor-runtime-$RT-win64.zip" >> "$GITHUB_OUTPUT"
+            echo "new=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=yes" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build
+        run: python portable/build.py --version "${{ steps.v.outputs.version }}" --repo "$GITHUB_REPOSITORY" ${{ steps.rt.outputs.args }}
+      - name: Publish the new runtime
+        if: steps.rt.outputs.new == 'yes'
+        run: |
+          RT="${{ steps.v.outputs.runtime }}"
+          gh release create "runtime-$RT" "dist/tw-editor-runtime-$RT-win64.zip" --latest=false \
+            --title "Runtime $RT" --notes "Python and modules for the portable editor. Downloaded by the editor itself; you do not need this file."
+      - name: Publish the release
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          gh release create "v$V" "dist/tw-editor-$V-win64.zip" "dist/tw-editor-code-$V.zip" dist/version.json \
+            --latest --title "TW Editor $V" \
+            --notes "Download **tw-editor-$V-win64.zip**, unpack it anywhere and double-click **start.bat**. Nothing to install. The editor updates itself on start."

@@ -1,0 +1,13 @@
+cache/
+config.json
+__pycache__/
+ddnet-server/
+ddnet-server.part/
+user-rules/
+dist/
+runtime/
+runtime.new/
+runtime.old/
+start.bat.new
+version.json
+files.txt

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TW Editor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- Buttons with data-feature="<id>" belong to an optional module (js/features.js); they are removed when it is missing. -->
+<div id="app" class="no-right">
+  <header id="topbar" class="island">
+    <div class="brand" title="TW Editor: DDNet map editor">TW</div>
+    <div class="menu" id="menu-file">
+      <button class="menu-btn">File</button>
+      <div class="menu-list">
+        <button data-cmd="new" data-icon="file">New map <kbd>Ctrl+N</kbd></button>
+        <button data-cmd="open" data-icon="folder">Open… <kbd>Ctrl+O</kbd></button>
+        <button data-cmd="save" data-icon="save">Save <kbd>Ctrl+S</kbd></button>
+        <button data-cmd="saveas" data-icon="save">Save as… <kbd>Ctrl+Shift+S</kbd></button>
+        <hr>
+        <button data-cmd="append" data-icon="folderPlus">Append from another map…</button>
+        <button data-cmd="quadart" data-icon="sparkles" data-feature="quadart">Quad art from image…</button>
+        <button data-cmd="tileart" data-icon="tiles" data-feature="tileart">Tile art from image (pixel = tile)…</button>
+        <button data-cmd="rulesmaker" data-icon="tiles" data-feature="rulesmaker">New rules design (Rules maker)…</button>
+      </div>
+    </div>
+    <div class="menu" id="menu-edit">
+      <button class="menu-btn">Edit</button>
+      <div class="menu-list">
+        <button data-cmd="undo" data-icon="undo">Undo <kbd>Ctrl+Z</kbd></button>
+        <button data-cmd="redo" data-icon="redo">Redo <kbd>Ctrl+Y</kbd></button>
+        <hr>
+        <button data-cmd="mapinfo" data-icon="file">Map details…</button>
+        <button data-cmd="goto" data-icon="home">Go to position…</button>
+        <button data-cmd="pipette" data-icon="focus">Colour picker <kbd>Ctrl+Shift+C</kbd></button>
+        <button data-cmd="info" data-icon="tiles">Show tile info <kbd>Ctrl+I</kbd></button>
+        <button data-cmd="settings" data-icon="settings">Editor settings…</button>
+        <button data-cmd="help" data-icon="terminal">Shortcuts… <kbd>F1</kbd></button>
+      </div>
+    </div>
+    <span class="sep"></span>
+    <div class="seg">
+      <button class="ib" data-cmd="undo" data-icon="undo" title="Undo (Ctrl+Z)"></button>
+      <button class="ib" data-cmd="redo" data-icon="redo" title="Redo (Ctrl+Y)"></button>
+    </div>
+    <div class="seg" title="Brush">
+      <button class="ib" data-cmd="flipx" data-icon="flipH" title="[N] Flip brush / quads horizontally"></button>
+      <button class="ib" data-cmd="flipy" data-icon="flipV" title="[M] Flip brush / quads vertically"></button>
+      <button class="ib" data-cmd="rotccw" data-icon="rotL" title="[Shift+R] Rotate counter-clockwise by the step. Hold R with quads selected to rotate freely."></button>
+      <input type="number" id="rot-step" class="rot-step" value="90" min="1" max="359" step="1" title="Rotation step in degrees (drag left/right or type). Tile brushes use multiples of 90.">
+      <button class="ib" data-cmd="rotcw" data-icon="rotR" title="[T] Rotate clockwise by the step"></button>
+      <button data-cmd="qbrush" id="btn-qbrush" class="toggle" data-icon="copy" title="[B] Quad brush: grab the selected quads into a brush and stamp copies with clicks. Shift+drag a box over quads also grabs them." disabled>Brush</button>
+      <button data-cmd="pen" id="btn-pen" class="toggle" data-feature="pen" data-icon="pen" title="[D] Quad pen: click points to draw a stroke of quads, drag for curves. Settings in the right panel." disabled>Pen</button>
+      <button data-cmd="gores" id="btn-gores" class="toggle" data-feature="gores" data-icon="snow" title="[G] Gores mode (Game layer): hookable tiles always get a ring of freeze. Only tiles next to your edit change.">Gores</button>
+    </div>
+    <div class="seg">
+      <button data-cmd="grid" id="btn-grid" class="ib toggle" data-icon="grid" title="[Ctrl+G] Grid"></button>
+      <button data-cmd="proof" id="btn-proof" class="ib toggle" data-icon="proof" title="[Ctrl+P] Game screen frame (proof)"></button>
+      <button data-cmd="parallax" id="btn-parallax" class="ib toggle on" data-icon="parallax" title="Show group parallax"></button>
+      <button data-cmd="pzoom" id="btn-pzoom" class="ib toggle on" data-icon="pzoom" title="Parallax zoom: distant groups zoom slower (like in game)"></button>
+      <button data-cmd="clip" id="btn-clip" class="ib toggle on" data-icon="clip" title="Show group clipping"></button>
+      <button data-cmd="dim" id="btn-dim" class="ib toggle" data-icon="focus" title="Dim all layers except the selected one"></button>
+      <button data-cmd="play" id="btn-play" class="ib toggle" data-icon="play" title="Play animations (envelopes)"></button>
+    </div>
+    <label class="slider" title="Entities opacity (game, front, tele…)"><span class="slider-ic"></span>
+      <input type="range" id="ent-alpha" min="0" max="100" value="100">
+    </label>
+    <span class="grow"></span>
+    <button data-cmd="testmap" id="btn-testmap" class="toggle" data-feature="testmap" data-icon="flask">Test</button>
+    <button data-cmd="quadart" class="accent" data-feature="quadart" data-icon="sparkles" title="Built-in image to quads converter">Quad art</button>
+    <span id="map-title">untitled</span>
+    <button data-cmd="props" id="btn-props" class="ib toggle" data-icon="settings" title="[P] Show/hide the properties panel (everything in it is also in the right-click menus)"></button>
+    <button data-cmd="save" class="ib" data-icon="save" title="Save (Ctrl+S)"></button>
+  </header>
+
+  <aside id="left" class="island">
+    <div class="panel-head">
+      <span>Layers</span>
+      <div class="head-btns">
+        <button data-cmd="addgroup" data-icon="folderPlus" title="New group">Group</button>
+      </div>
+    </div>
+    <div id="layers"></div>
+    <div class="rz rz-v" id="rz-left" title="Drag to resize"></div>
+  </aside>
+
+  <main id="view">
+    <canvas id="gl"></canvas>
+    <canvas id="overlay"></canvas>
+    <div id="picker" hidden></div>
+    <div id="tooltip" hidden></div>
+  </main>
+
+  <aside id="right" class="island">
+    <div class="panel-head"><span id="props-title">Properties</span></div>
+    <div id="palette" class="palette" data-feature="palette"></div>
+    <div id="props"></div>
+    <div class="rz rz-v" id="rz-right" title="Drag to resize"></div>
+  </aside>
+
+  <section id="bottom" class="island">
+    <div class="rz rz-h" id="rz-bottom" title="Drag to resize"></div>
+    <div class="panel-head"><span id="bottom-title">Images</span><button id="bottom-close" class="ib" data-icon="x" title="Close (or click the tab button again)"></button></div>
+    <div id="tab-body"></div>
+  </section>
+
+  <div id="dock" class="island">
+    <nav id="tabs">
+      <button class="ib" data-tab="images" data-icon="image" title="Images"></button>
+      <button class="ib" data-tab="timeline" data-feature="timeline" data-icon="keys" title="Timeline: animate quads with keys (K)"></button>
+      <button class="ib" data-tab="envelopes" data-icon="wave" title="Envelopes"></button>
+      <button class="ib" data-tab="sounds" data-icon="sound" title="Sounds"></button>
+      <button class="ib" data-tab="server" data-icon="terminal" title="Server settings"></button>
+      <button class="ib" data-tab="history" data-icon="history" title="History"></button>
+      <button class="ib" data-tab="rulesmaker" data-feature="rulesmaker" data-icon="tiles" title="Rules maker: paint a design, get automapper rules"></button>
+    </nav>
+    <span class="dock-sep"></span>
+    <div id="zoombar">
+      <button class="ib" data-cmd="zoomout" data-icon="minus" title="[-] Zoom out"></button>
+      <span id="zoom-label">100%</span>
+      <button class="ib" data-cmd="zoomin" data-icon="plus" title="[+] Zoom in"></button>
+      <button class="ib" data-cmd="zoomreset" data-icon="home" title="[Home] Reset view to centre and 100%"></button>
+    </div>
+  </div>
+
+  <footer id="status">
+    <span id="st-pos"></span>
+    <span id="st-tile"></span>
+    <span class="grow"></span>
+    <span id="st-busy" hidden><i class="spin"></i><span></span></span>
+    <span id="st-msg"></span>
+  </footer>
+</div>
+
+<div id="modal-root"></div>
+<input type="file" id="file-open" accept=".map" hidden>
+<input type="file" id="file-img" accept="image/*" hidden multiple>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

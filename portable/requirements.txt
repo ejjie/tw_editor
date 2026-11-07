@@ -1,0 +1,6 @@
+# Modules inside the portable runtime (Windows, 64 bit). Pinned: changing a line here (or PYTHON in build.py)
+# makes a new runtime version, and only then players download the big runtime archive again.
+numpy==2.5.4
+pillow==13.0.0
+opencv-python-headless==4.14.0.94
+mapbox-earcut==2.1.0

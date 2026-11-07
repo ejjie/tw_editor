@@ -1,0 +1,825 @@
+[AUTO MAP]
+
+[• Mixed Stars]
+
+#remove possbile border tiles
+Index 0
+Pos 0 0 INDEX 1
+Pos -1 0 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 0 -1 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 1 0 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 0 1 INDEX -1
+
+
+#random stars, bigger stars are less likely
+NewRun
+NoLayerCopy
+
+Index 12
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 12 
+Pos 0 -1 NOTINDEX 12 
+Pos -1 -1 NOTINDEX 12
+Pos 1 -1 NOTINDEX 12
+Random 50
+
+Index 10
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 10 
+Pos 0 -1 NOTINDEX 10 
+Pos -1 -1 NOTINDEX 10
+Pos 1 -1 NOTINDEX 10
+Random 32
+
+Index 8
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 8 
+Pos 0 -1 NOTINDEX 8
+Pos -1 -1 NOTINDEX 8
+Pos 1 -1 NOTINDEX 8
+Random 16
+
+Index 6
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 6
+Pos 0 -1 NOTINDEX 6
+Pos -1 -1 NOTINDEX 6
+Pos 1 -1 NOTINDEX 6
+Random 8
+
+Index 4
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 4
+Pos 0 -1 NOTINDEX 4
+Pos -1 -1 NOTINDEX 4
+Pos 1 -1 NOTINDEX 4
+Random 4
+
+Index 2
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 2
+Pos 0 -1 NOTINDEX 2
+Pos -1 -1 NOTINDEX 2
+Pos 1 -1 NOTINDEX 2
+Random 2
+
+#clean up
+NewRun
+Index 0
+Pos 0 0 INDEX 1
+
+#add different designs
+
+Index 3
+Pos 0 0 INDEX 2
+Random 2
+
+Index 5
+Pos 0 0 INDEX 4
+Random 2
+
+Index 7
+Pos 0 0 INDEX 6
+Random 2
+
+Index 9
+Pos 0 0 INDEX 8
+Random 2
+
+Index 11
+Pos 0 0 INDEX 10
+Random 2
+
+Index 13
+Pos 0 0 INDEX 12
+Random 2
+
+#change some rotations for more variety
+NewRun
+NoLayerCopy
+
+Index 2 ROTATE
+Pos 0 0 INDEX 2 NONE
+Random 4
+
+Index 2 XFLIP YFLIP
+Pos 0 0 INDEX 2 NONE
+Random 3
+
+Index 2 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 2 NONE
+Random 2
+
+Index 3 ROTATE
+Pos 0 0 INDEX 3 NONE
+Random 4
+
+Index 3 XFLIP YFLIP
+Pos 0 0 INDEX 3 NONE
+Random 3
+
+Index 3 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 3 NONE
+Random 2
+
+Index 4 ROTATE
+Pos 0 0 INDEX 4 NONE
+Random 4
+
+Index 4 XFLIP YFLIP
+Pos 0 0 INDEX 4 NONE
+Random 3
+
+Index 4 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 4 NONE
+Random 2
+
+Index 5 ROTATE
+Pos 0 0 INDEX 5 NONE
+Random 4
+
+Index 5 XFLIP YFLIP
+Pos 0 0 INDEX 5 NONE
+Random 3
+
+Index 5 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 5 NONE
+Random 2
+
+Index 6 ROTATE
+Pos 0 0 INDEX 6 NONE
+Random 4
+
+Index 6 XFLIP YFLIP
+Pos 0 0 INDEX 6 NONE
+Random 3
+
+Index 6 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 6
+Random 2
+
+Index 7 ROTATE
+Pos 0 0 INDEX 7 NONE
+Random 4
+
+Index 7 XFLIP YFLIP
+Pos 0 0 INDEX 7 NONE
+Random 3
+
+Index 7 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 7 NONE
+Random 2
+
+Index 8 ROTATE
+Pos 0 0 INDEX 8 NONE
+Random 4
+
+Index 8 XFLIP YFLIP
+Pos 0 0 INDEX 8 NONE
+Random 3
+
+Index 8 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 8 NONE
+Random 2
+
+Index 9 ROTATE
+Pos 0 0 INDEX 9 NONE
+Random 4
+
+Index 9 XFLIP YFLIP
+Pos 0 0 INDEX 9 NONE
+Random 3
+
+Index 9 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 9 NONE
+Random 2
+
+Index 10 ROTATE
+Pos 0 0 INDEX 10 NONE
+Random 4
+
+Index 10 XFLIP YFLIP
+Pos 0 0 INDEX 10 NONE
+Random 3
+
+Index 10 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 10 NONE
+Random 2
+
+Index 11 ROTATE
+Pos 0 0 INDEX 11 NONE
+Random 4
+
+Index 11 XFLIP YFLIP
+Pos 0 0 INDEX 11 NONE
+Random 3
+
+Index 11 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 11 NONE
+Random 2
+
+Index 12 ROTATE
+Pos 0 0 INDEX 12 NONE
+Random 4
+
+Index 12 XFLIP YFLIP
+Pos 0 0 INDEX 12 NONE
+Random 3
+
+Index 12 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 12 NONE
+Random 2
+
+Index 13 ROTATE
+Pos 0 0 INDEX 13 NONE
+Random 4
+
+Index 13 XFLIP YFLIP
+Pos 0 0 INDEX 13 NONE
+Random 3
+
+Index 13 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 13 NONE
+Random 2
+
+
+
+[• Small Stars]
+
+#remove possbile border tiles
+Index 0
+Pos 0 0 INDEX 1
+Pos -1 0 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 0 -1 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 1 0 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 0 1 INDEX -1
+
+
+#random stars, bigger stars are less likely
+NewRun
+NoLayerCopy
+
+Index 6
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 6
+Pos 0 -1 NOTINDEX 6
+Pos -1 -1 NOTINDEX 6
+Pos 1 -1 NOTINDEX 6
+Random 8
+
+Index 4
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 4
+Pos 0 -1 NOTINDEX 4
+Pos -1 -1 NOTINDEX 4
+Pos 1 -1 NOTINDEX 4
+Random 4
+
+Index 2
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 2
+Pos 0 -1 NOTINDEX 2
+Pos -1 -1 NOTINDEX 2
+Pos 1 -1 NOTINDEX 2
+Random 2
+
+#clean up
+NewRun
+Index 0
+Pos 0 0 INDEX 1
+
+#add different designs
+
+Index 3
+Pos 0 0 INDEX 2
+Random 2
+
+Index 5
+Pos 0 0 INDEX 4
+Random 2
+
+Index 7
+Pos 0 0 INDEX 6
+Random 2
+
+
+
+#change some rotations for more variety
+NewRun
+NoLayerCopy
+
+Index 2 ROTATE
+Pos 0 0 INDEX 2 NONE
+Random 4
+
+Index 2 XFLIP YFLIP
+Pos 0 0 INDEX 2 NONE
+Random 3
+
+Index 2 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 2 NONE
+Random 2
+
+Index 3 ROTATE
+Pos 0 0 INDEX 3 NONE
+Random 4
+
+Index 3 XFLIP YFLIP
+Pos 0 0 INDEX 3 NONE
+Random 3
+
+Index 3 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 3 NONE
+Random 2
+
+Index 4 ROTATE
+Pos 0 0 INDEX 4 NONE
+Random 4
+
+Index 4 XFLIP YFLIP
+Pos 0 0 INDEX 4 NONE
+Random 3
+
+Index 4 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 4 NONE
+Random 2
+
+Index 5 ROTATE
+Pos 0 0 INDEX 5 NONE
+Random 4
+
+Index 5 XFLIP YFLIP
+Pos 0 0 INDEX 5 NONE
+Random 3
+
+Index 5 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 5 NONE
+Random 2
+
+Index 6 ROTATE
+Pos 0 0 INDEX 6 NONE
+Random 4
+
+Index 6 XFLIP YFLIP
+Pos 0 0 INDEX 6 NONE
+Random 3
+
+Index 6 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 6
+Random 2
+
+Index 7 ROTATE
+Pos 0 0 INDEX 7 NONE
+Random 4
+
+Index 7 XFLIP YFLIP
+Pos 0 0 INDEX 7 NONE
+Random 3
+
+Index 7 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 7 NONE
+Random 2
+
+
+
+
+
+
+
+[• few Big Stars]
+
+#remove possbile border tiles
+Index 0
+Pos 0 0 INDEX 1
+Pos -1 0 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 0 -1 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 1 0 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 0 1 INDEX -1
+
+
+#random stars, bigger stars are less likely
+NewRun
+NoLayerCopy
+
+Index 12
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 12 
+Pos 0 -1 NOTINDEX 12 
+Pos -1 -1 NOTINDEX 12
+Pos 1 -1 NOTINDEX 12
+Random 50
+
+Index 10
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 10 
+Pos 0 -1 NOTINDEX 10 
+Pos -1 -1 NOTINDEX 10
+Pos 1 -1 NOTINDEX 10
+Random 32
+
+Index 8
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 8 
+Pos 0 -1 NOTINDEX 8
+Pos -1 -1 NOTINDEX 8
+Pos 1 -1 NOTINDEX 8
+Random 16
+
+
+#clean up
+NewRun
+Index 0
+Pos 0 0 INDEX 1
+
+#add different designs
+
+Index 9
+Pos 0 0 INDEX 8
+Random 2
+
+Index 11
+Pos 0 0 INDEX 10
+Random 2
+
+Index 13
+Pos 0 0 INDEX 12
+Random 2
+
+#change some rotations for more variety
+NewRun
+NoLayerCopy
+
+
+Index 8 ROTATE
+Pos 0 0 INDEX 8 NONE
+Random 4
+
+Index 8 XFLIP YFLIP
+Pos 0 0 INDEX 8 NONE
+Random 3
+
+Index 8 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 8 NONE
+Random 2
+
+Index 9 ROTATE
+Pos 0 0 INDEX 9 NONE
+Random 4
+
+Index 9 XFLIP YFLIP
+Pos 0 0 INDEX 9 NONE
+Random 3
+
+Index 9 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 9 NONE
+Random 2
+
+Index 10 ROTATE
+Pos 0 0 INDEX 10 NONE
+Random 4
+
+Index 10 XFLIP YFLIP
+Pos 0 0 INDEX 10 NONE
+Random 3
+
+Index 10 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 10 NONE
+Random 2
+
+Index 11 ROTATE
+Pos 0 0 INDEX 11 NONE
+Random 4
+
+Index 11 XFLIP YFLIP
+Pos 0 0 INDEX 11 NONE
+Random 3
+
+Index 11 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 11 NONE
+Random 2
+
+Index 12 ROTATE
+Pos 0 0 INDEX 12 NONE
+Random 4
+
+Index 12 XFLIP YFLIP
+Pos 0 0 INDEX 12 NONE
+Random 3
+
+Index 12 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 12 NONE
+Random 2
+
+Index 13 ROTATE
+Pos 0 0 INDEX 13 NONE
+Random 4
+
+Index 13 XFLIP YFLIP
+Pos 0 0 INDEX 13 NONE
+Random 3
+
+Index 13 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 13 NONE
+Random 2
+
+
+[• many Big Stars]
+
+#remove possbile border tiles
+Index 0
+Pos 0 0 INDEX 1
+Pos -1 0 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 0 -1 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 1 0 INDEX -1
+
+Index 0
+Pos 0 0 INDEX 1
+Pos 0 1 INDEX -1
+
+
+#random stars, bigger stars are less likely
+NewRun
+NoLayerCopy
+
+Index 12
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 12 
+Pos 0 -1 NOTINDEX 12 
+Pos -1 -1 NOTINDEX 12
+Pos 1 -1 NOTINDEX 12
+Random 16
+
+Index 10
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 10 
+Pos 0 -1 NOTINDEX 10 
+Pos -1 -1 NOTINDEX 10
+Pos 1 -1 NOTINDEX 10
+Random 8
+
+Index 8
+Pos 0 0 INDEX 1
+Pos -1 0 NOTINDEX 8 
+Pos 0 -1 NOTINDEX 8
+Pos -1 -1 NOTINDEX 8
+Pos 1 -1 NOTINDEX 8
+Random 4
+
+
+#clean up
+NewRun
+Index 0
+Pos 0 0 INDEX 1
+
+#add different designs
+
+Index 9
+Pos 0 0 INDEX 8
+Random 2
+
+Index 11
+Pos 0 0 INDEX 10
+Random 2
+
+Index 13
+Pos 0 0 INDEX 12
+Random 2
+
+#change some rotations for more variety
+NewRun
+NoLayerCopy
+
+
+Index 8 ROTATE
+Pos 0 0 INDEX 8 NONE
+Random 4
+
+Index 8 XFLIP YFLIP
+Pos 0 0 INDEX 8 NONE
+Random 3
+
+Index 8 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 8 NONE
+Random 2
+
+Index 9 ROTATE
+Pos 0 0 INDEX 9 NONE
+Random 4
+
+Index 9 XFLIP YFLIP
+Pos 0 0 INDEX 9 NONE
+Random 3
+
+Index 9 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 9 NONE
+Random 2
+
+Index 10 ROTATE
+Pos 0 0 INDEX 10 NONE
+Random 4
+
+Index 10 XFLIP YFLIP
+Pos 0 0 INDEX 10 NONE
+Random 3
+
+Index 10 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 10 NONE
+Random 2
+
+Index 11 ROTATE
+Pos 0 0 INDEX 11 NONE
+Random 4
+
+Index 11 XFLIP YFLIP
+Pos 0 0 INDEX 11 NONE
+Random 3
+
+Index 11 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 11 NONE
+Random 2
+
+Index 12 ROTATE
+Pos 0 0 INDEX 12 NONE
+Random 4
+
+Index 12 XFLIP YFLIP
+Pos 0 0 INDEX 12 NONE
+Random 3
+
+Index 12 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 12 NONE
+Random 2
+
+Index 13 ROTATE
+Pos 0 0 INDEX 13 NONE
+Random 4
+
+Index 13 XFLIP YFLIP
+Pos 0 0 INDEX 13 NONE
+Random 3
+
+Index 13 ROTATE XFLIP YFLIP
+Pos 0 0 INDEX 13 NONE
+Random 2
+
+
+
+[REMOVE SOME]
+
+[• 20% mixed]
+
+Index 0
+Pos 0 0 INDEX 2 OR 3
+Random 5
+
+Index 0
+Pos 0 0 INDEX 4 OR 5
+Random 5
+
+Index 0
+Pos 0 0 INDEX 6 OR 7
+Random 5
+
+Index 0
+Pos 0 0 INDEX 8 OR 9
+Random 5
+
+Index 0
+Pos 0 0 INDEX 10 OR 11
+Random 5
+
+Index 0
+Pos 0 0 INDEX 12 OR 13
+Random 5
+
+
+[• 20% small]
+
+Index 0
+Pos 0 0 INDEX 2 OR 3
+Random 5
+
+Index 0
+Pos 0 0 INDEX 4 OR 5
+Random 5
+
+Index 0
+Pos 0 0 INDEX 6 OR 7
+Random 5
+
+
+
+[• 20% big]
+
+Index 0
+Pos 0 0 INDEX 8 OR 9
+Random 10
+
+Index 0
+Pos 0 0 INDEX 10 OR 11
+Random 10
+
+Index 0
+Pos 0 0 INDEX 12 OR 13
+Random 10
+
+
+[REMOVE ALL]
+
+[• small]
+
+Index 0
+Pos 0 0 INDEX 2 OR 3
+
+Index 0
+Pos 0 0 INDEX 4 OR 5
+
+Index 0
+Pos 0 0 INDEX 6 OR 7
+
+
+[• big]
+
+Index 0
+Pos 0 0 INDEX 8 OR 9
+
+
+Index 0
+Pos 0 0 INDEX 10 OR 11
+
+
+Index 0
+Pos 0 0 INDEX 12 OR 13
+
+
+
+[• XS]
+
+Index 0
+Pos 0 0 INDEX 2 OR 3
+
+[• S]
+
+Index 0
+Pos 0 0 INDEX 4 OR 5
+
+[• M]
+
+Index 0
+Pos 0 0 INDEX 6 OR 7
+
+[• L]
+
+Index 0
+Pos 0 0 INDEX 8 OR 9
+
+[• XL]
+
+Index 0
+Pos 0 0 INDEX 10 OR 11
+
+[• XXL]
+
+Index 0
+Pos 0 0 INDEX 12 OR 13
+
+
+
+
+
+[]
+
+[ by mind]
