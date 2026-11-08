@@ -147,8 +147,11 @@ button.pick.open .pick-chev { transform: rotate(-135deg); margin-top: 4px; }
 .pick-opt.on::after { content: ''; flex: none; width: 5px; height: 10px; margin: -2px var(--s1) 0 auto; border: solid var(--accent-text); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .pick-find { height: var(--h) !important; }
 .pick-menu.grid { width: 360px; }
-.pick-menu.grid .pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--s2); }
-.pick-menu.grid .pick-opt { flex-direction: column; gap: var(--s1); padding: var(--s2); min-height: 0; }
+.pick-find { flex: none; width: 100%; }
+/* rows keep their full height and the list scrolls; without max-content the rows collapse to fit the window and the tiles overlap */
+.pick-menu.grid .pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); grid-auto-rows: max-content; align-content: start; min-height: 0; gap: var(--s2); }
+.pick-menu.grid .pick-opt { flex-direction: column; justify-content: flex-start; gap: var(--s1); padding: var(--s2); min-height: 0; height: auto; min-width: 0; }
+.pick-menu.grid .pick-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick-menu.grid .pick-opt.on::after { display: none; }
 .pick-menu.grid .pick-opt.on { box-shadow: inset 0 0 0 2px var(--accent); }
 .pick-menu.grid .pick-pv { width: 72px; height: 72px; border-radius: var(--r-xs); background: repeating-conic-gradient(#3a3c42 0 25%, #2e3035 0 50%) 0 0/12px 12px; }
