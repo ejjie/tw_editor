@@ -318,5 +318,5 @@ export async function loadRules(imageName) {
   return p;
 }
 
-// read the file again next time (the Rules maker added configs to it)
+// read the file again next time (it changed on disk)
 export function forgetRules(imageName) { cache.delete(imageName); }
