@@ -38,7 +38,6 @@ EXCLUDE = [
     "config.json", "cache/*", "ddnet-server/*", "ddnet-server.part/*", "user-rules/*",
     "runtime/*", "runtime.new/*", "runtime.old/*", "version.json", "files.txt", "start.bat.new",
     "*.png",  # screenshots at the top; pictures in subfolders are listed in KEEP_PNG
-    "docs/*",  # README screenshots
     "requirements.txt",  # pip modules for the development folder; the runtime has them
 ]
 KEEP_PNG = ["web/*", "extra-data/*", "styles/*"]
