@@ -1,228 +1,190 @@
-// Module "design". "Design it!": a gallery of ready-made presets, with variants chosen inside the preset. A preset says which mapres + automapper
-// config draws each kind of entity (hook, unhook, freeze, ...). Applying it adds a "Design" group right after the Game
-// group with one automapped tile layer per kind that the map uses (freeze at the bottom, hook on top).
-import { h, modal, btn, check, select, closePopup } from './ui.js';
+// Module "design". "Design it!": draws the map with ready tilesets. One automapped tile layer per kind of tile
+// (hook, freeze, ...) in a new "Design" group right after the Game group.
+// The window: Presets on the left (they fill in every setting), the preview of the player's own map in the middle
+// (its game layers + its BG group, the camera on the spawn), the settings on the right: per kind a tileset, then
+// the options of that tileset's rules.
+import { h, modal, btn, check, select, closePopup, rgba } from './ui.js';
 import { iconEl } from './icons.js';
-import { newGroup, newTileLayer, findGameLayer, loadMap, TILE_BYTES } from './map.js';
+import { newGroup, newTileLayer, findGameLayer, TILE_BYTES } from './map.js';
 import { loadRules, runAutomapper } from './automapper.js';
 import { loadImage, Renderer } from './render.js';
 
 const TILE = 32;
-const FREEZE_ALPHA = 100;
-
-// bottom -> top. src: which physics layer the kind is read from; ids: tile indices (null = any non-empty)
-const KINDS = [
-  { key: 'freeze', label: 'Freeze', src: 'game', ids: [9, 12] },
-  { key: 'unfreeze', label: 'Unfreeze', src: 'game', ids: [11, 13] },
-  { key: 'death', label: 'Death', src: 'game', ids: [2] },
-  { key: 'tune', label: 'Tune', src: 'tune', ids: null },
-  { key: 'tele', label: 'Tele', src: 'tele', ids: null },
-  { key: 'unhook', label: 'Unhook', src: 'game', ids: [3] },
-  { key: 'hook', label: 'Hook', src: 'game', ids: [1] },
-];
-
-// A pick says how one kind is drawn: image + config(s), the colour of the layer, and what the layer holds before
-// the rules run: "game" = a copy of the whole game layer (amazing_freeze reads hook around the freeze),
-// a number = that tile wherever the kind is (default 1, or the fill tile the config keeps).
-// cfg can be a list: the configs are run one after another (amazing_freeze: base, then inside and outside corners).
-const WHITE = [255, 255, 255, 255];
-const EMBED = new Set(['amazing_freeze']); // not in DDNet's mapres: embedded so the map works anywhere
-const pick = (img, cfg, color = WHITE, input) => ({ img, cfg, color, input });
-const AF = 'amazing_freeze';
-const DEATH = { plain: true, color: [255, 0, 0, 255], img: null, cfg: 'plain red tiles' };
-const UNHOOKS = ['Random Silver', 'Random Gold', 'Random Bronze', 'Silver/Gold-Mix', 'Copper/Silver-Mix', 'Gold/Copper-Mix', 'Mix All'];
 const SEED = 1; // fixed, so the result is what the preview shows
+const AF = 'amazing_freeze', STONES = 'Stones07_GreyMix_Sharp', MEADOW = 'meadow_obsidian';
 
-// Ready-made presets: the settings below and a picture (web/presets/<file>.png) for the gallery card. The big
-// preview draws the preset on the shared platform map. The kinds are drawn as the preset says; inside a preset the user
-// picks the hook config, the unhook config and the inside / outside corners of the amazing_freeze freeze.
+// bottom -> top. src: which physics layer the kind is read from; ids: tile indices (null = any non-empty).
+// fill: the tile the layer is drawn with before amazing_freeze's rules run ('game' = a copy of the game layer, only
+// freeze: it alone gets a freeze style; every other kind is plain tile 1 + the corner configs)
+const KINDS = [
+  { key: 'freeze', label: 'Freeze', src: 'game', ids: [9, 12], fill: 'game' },
+  { key: 'unfreeze', label: 'Unfreeze', src: 'game', ids: [11, 13], fill: 1 },
+  { key: 'death', label: 'Death', src: 'game', ids: [2], fill: 1 },
+  { key: 'tune', label: 'Tune', src: 'tune', ids: null, fill: 1 },
+  { key: 'tele', label: 'Tele', src: 'tele', ids: [10, 26, 31, 63], fill: 1 }, // FROM + CFRM, red and blue
+  // hook: everything solid is drawn with the hook tileset: hook and unhook, so its edges follow the whole wall.
+  // Unhook is then drawn on top with its own tileset. Hookthrough = unhook in game + tile 66 in front: its own layer,
+  // the top one: every other layer is cleared under it.
+  // with amazing_freeze (flat blocks) the hook is not drawn under the unhook: hook tiles only (byTileset)
+  { key: 'hook', label: 'Hook', src: 'game', ids: [1, 3], fill: 1, byTileset: { [AF]: { ids: [1] } } },
+  // hook the hook tileset can't draw (meadow_obsidian has no 1 tile thick blocks): stones over it, same mask as hook,
+  // the rules ("THIN HOOK" in Stones07_GreyMix_Sharp.rules) keep the 1 thick parts + 1 tile towards the hook
+  { key: 'hookfix', label: 'Thin hook', src: 'game', ids: [1, 3], fill: 1, pre: '• 1 thick +1' },
+  { key: 'unhook', label: 'Unhook', src: 'game', ids: [3], fill: 1, not: { src: 'front', ids: [66] } },
+  { key: 'hookthrough', label: 'Hookthrough', src: 'game', ids: [3], fill: 1, only: { src: 'front', ids: [66] } },
+];
+const KIND = Object.fromEntries(KINDS.map((k) => [k.key, k]));
+
+// The tilesets Design it! knows. rules: the .rules file; layers: one map layer per image, all with the same tiles
+// (meadow_obsidian: ground + grass edge); base: the section whose configs are the "Style" list; mods: sections
+// whose config (or Off) runs after the base, in this order. Configs are kept as indices (names repeat between sections).
+const TILESETS = {
+  [MEADOW]: {
+    label: 'Meadow obsidian', rules: MEADOW, thin: true, // no 1 tile thick blocks: the Thin hook layer fixes them
+    layers: [{ img: 'meadow_obsidian_white_bottom', name: '' }, { img: 'meadow_obsidian_white_top', name: 'top' }],
+    base: { section: 'WHOLE MAP', def: ' Default' },
+    mods: [
+      { section: 'GRASS STYLE', label: 'Grass' },
+      { section: 'DIRT STYLE', label: 'Dirt' },
+      { section: 'DIRT CORNERS', label: 'Dirt corners' },
+      { section: 'INSIDE DECO', label: 'Deco' },
+    ],
+  },
+  [STONES]: {
+    label: 'Stones 07 grey mix', rules: STONES, layers: [{ img: STONES, name: '' }],
+    base: { section: 'WHOLE MAP', def: '• Grey Mixed' },
+    mods: [{ section: 'ADD BLOCKS', label: 'Blocks' }, { section: 'RANDOMIZE ONES', label: 'Randomize' }],
+  },
+  [AF]: {
+    label: 'Amazing freeze', rules: AF, layers: [{ img: AF, name: '' }], kindFill: true, skip: ['ejjie preset'],
+    // the freeze style (Uneven Tiles) only for freeze; the other kinds (drawn with tile 1) use the one GAME TO HOOK config
+    base: { section: 'GAME TO FREEZE', def: ' Uneven Tiles ⌇', fixed: true }, hookBase: 'GAME TO HOOK',
+    mods: [{ section: 'INSIDE CORNERS', label: 'Inside corners', def: '> Soft S' }, { section: 'OUTSIDE CORNERS', label: 'Outside corners', def: '< Soft S' }],
+  },
+  plain: { label: 'Plain', plain: true, layers: [{ img: null, name: '' }], mods: [] },
+};
+// not in DDNet's mapres (they come from extra-data/): embedded so the map works anywhere
+const EMBED = new Set([AF, STONES, 'meadow_obsidian_white_bottom', 'meadow_obsidian_white_top']);
+// which tilesets each kind can be drawn with
+const CHOICES = {
+  hook: [MEADOW, STONES, AF], hookfix: [STONES], unhook: [STONES, AF], hookthrough: [STONES, AF],
+  freeze: [AF], unfreeze: [AF], death: ['plain', AF], tune: [AF], tele: [AF],
+};
+
+// Presets: a tileset, options (by config name) and colours for each kind. Kinds a preset leaves out are off.
 const PRESETS = [
   {
-    name: 'Grass', file: 'grass', drawn: true,
-    hook: { img: 'grass_main', cfgs: ['Default', 'Grass', 'Dirt', 'Cave'] },
-    freeze: { base: ' Uneven Tiles ⌇', inside: '> Soft S', outside: '< Soft M', color: [0, 0, 0, FREEZE_ALPHA] },
-    unhook: 'Random Silver',
+    name: 'Grass meadow', card: 'presets/meadow_obsidian.png',
+    kinds: {
+      hook: { ts: MEADOW, colors: [[62, 52, 78, 255], [126, 196, 84, 255]] },
+      hookfix: { ts: STONES, colors: [[150, 128, 178, 255]] }, // lilac, close to the meadow ground
+      unhook: { ts: STONES, colors: [[196, 214, 236, 255]] }, // light steel blue
+      hookthrough: { ts: STONES, colors: [[255, 196, 110, 160]] }, // amber, see-through
+      freeze: { ts: AF, colors: [[0, 0, 0, 100]] },
+      unfreeze: { ts: AF, colors: [[140, 255, 160, 120]] },
+      tele: { ts: AF, colors: [[90, 170, 255, 255]] },
+      tune: { ts: AF, colors: [[190, 120, 255, 120]] },
+      death: { ts: 'plain', colors: [[255, 0, 0, 255]] },
+    },
+  },
+  {
+    // Stones07_GreyMix_Sharp for everything solid (hook natural grey, unhook steel blue on top), amazing_freeze for the rest
+    name: 'Generic stones', card: 'presets/generic_stones.png',
+    kinds: {
+      hook: { ts: STONES, colors: [[228, 226, 222, 255]] },
+      unhook: { ts: STONES, colors: [[120, 138, 168, 255]] },
+      hookthrough: { ts: STONES, colors: [[120, 138, 168, 140]] },
+      freeze: { ts: AF, colors: [[0, 0, 0, 100]] },
+      unfreeze: { ts: AF, colors: [[140, 255, 160, 120]] },
+      tele: { ts: AF, colors: [[90, 170, 255, 255]] },
+      tune: { ts: AF, colors: [[190, 120, 255, 120]] },
+      death: { ts: 'plain', colors: [[255, 0, 0, 255]] },
+    },
+  },
+  {
+    // every layer is amazing_freeze: flat blocks, Soft S corners
+    name: 'Amazing Flat', card: 'presets/amazing_flat.png',
+    kinds: {
+      hook: { ts: AF, colors: [[0, 0, 0, 255]] },
+      unhook: { ts: AF, colors: [[58, 60, 68, 255]] },
+      hookthrough: { ts: AF, colors: [[58, 60, 68, 120]] },
+      freeze: { ts: AF, colors: [[18, 18, 22, 100]] },
+      unfreeze: { ts: AF, colors: [[150, 235, 175, 110]] },
+      tele: { ts: AF, colors: [[70, 140, 255, 255]] },
+      tune: { ts: AF, colors: [[175, 115, 245, 110]] },
+      death: { ts: AF, colors: [[210, 40, 40, 255]] },
+    },
   },
 ];
-// Learned styles (tools/tilestyle.py, folders in styles/): every design layer of a finished map, redrawn by
-// editor.py from tables of "what was around -> which tile". Listed after the built-in presets.
-async function stylePresets() {
-  try {
-    const r = await fetch('/api/styles');
-    const list = r.ok ? await r.json() : [];
-    return list.map((s) => ({ name: s.title || s.name || s.id, style: s.id, layers: s.layers, images: s.images,
-      card: s.card ? '/styles/' + encodeURIComponent(s.id) + '/card.png' : null }));
-  } catch { return []; }
+
+// ---------------------------------------------------------------- rules
+
+// a tileset's rules split by section: configs under an UPPER CASE header belong to it (before any header: WHOLE MAP).
+// Entries are [config index, label, raw name].
+const sectionsCache = new Map();
+function rulesSections(ts) {
+  const T = TILESETS[ts];
+  if (!sectionsCache.has(ts)) sectionsCache.set(ts, loadRules(T.rules).then((confs) => {
+    const sec = {};
+    let cur = 'WHOLE MAP';
+    confs.forEach((c, i) => {
+      const n = c.name.trim();
+      if (!n || /^v[\d.]+ by /.test(n) || (T.skip || []).includes(n)) return;
+      if (n === n.toUpperCase() && /[A-Z]/.test(n) && !c.name.startsWith(' ') && !c.name.startsWith('•')) { cur = n; sec[cur] = sec[cur] || []; return; }
+      (sec[cur] = sec[cur] || []).push([i, n.replace(/^•\s*/, ''), c.name]);
+    });
+    return sec;
+  }));
+  return sectionsCache.get(ts);
+}
+const SECS = {}; // filled when the window opens
+const byName = (list, name) => { const e = (list || []).find((x) => x[2] === name); return e ? e[0] : null; };
+
+// the settings of one kind drawn with tileset ts: preset values (by config name) or the tileset's defaults
+function kindSettings(k, ts, p = {}, colors) {
+  const T = TILESETS[ts], sec = SECS[ts] || {};
+  const base = T.hookBase && k.fill === 1 ? T.hookBase : T.base ? (byName(sec[T.base.section], p.base || T.base.def) ?? ((sec[T.base.section] || [])[0] || [null])[0]) : null;
+  const mods = Object.fromEntries(T.mods.map((m) => [m.section, byName(sec[m.section], (p.mods || {})[m.section] ?? m.def)]));
+  const cols = T.layers.map((_, i) => [...((colors || [])[i] || (colors || [])[0] || [255, 255, 255, 255])]);
+  return { ts, base, mods, colors: cols };
 }
 
-// the style's layers for a map: editor.py gets the game (and front) tile indices and answers index + flags per layer
-async function buildStyleLayers(map, t, enabled) {
-  const game = findGameLayer(map).layer, W = game.width, H = game.height, n = W * H;
-  const front = physicsLayer(map, 'front');
-  const body = new Uint8Array(8 + 2 * n);
-  new DataView(body.buffer).setInt32(0, W, true);
-  new DataView(body.buffer).setInt32(4, H, true);
-  for (let i = 0; i < n; i++) body[8 + i] = game.tiles[i * 4];
-  if (front && front.width === W && front.height === H) for (let i = 0; i < n; i++) body[8 + n + i] = front.tiles[i * 4];
-  const r = await fetch('/api/style?name=' + encodeURIComponent(t.style), { method: 'POST', body });
-  if (!r.ok) {
-    let msg = 'HTTP ' + r.status;
-    try { msg = (await r.json()).error || msg; } catch { /* not json */ }
-    throw new Error(msg);
-  }
-  const out = new Uint8Array(await r.arrayBuffer());
-  const built = [];
-  let li = 0; // learned layers come back in the style's order; automapper layers are made here
-  for (const L of t.layers) {
-    const learned = !L.rules, slot = learned ? li++ : -1;
-    if (enabled && enabled['style:' + L.name] === false) continue;
-    const T = { width: W, height: H, tiles: new Uint8Array(n * 4) };
-    let index = -1;
-    if (learned) {
-      for (let i = 0; i < n; i++) { T.tiles[i * 4] = out[slot * n * 2 + i * 2]; T.tiles[i * 4 + 1] = out[slot * n * 2 + i * 2 + 1]; }
-    } else {
-      // automapper on a mask of the map: solid = hook + unhook, through = hookthrough (front 5); "not ..." = the rest
-      const not = L.rules.mask.startsWith('not '), what = not ? L.rules.mask.slice(4) : L.rules.mask;
-      const inMask = (i) => (what === 'through' ? (front ? front.tiles[i * 4] === 5 : false) : game.tiles[i * 4] === 1 || game.tiles[i * 4] === 3) !== not;
-      for (let i = 0; i < n; i++) if (inMask(i)) T.tiles[i * 4] = 1;
-      const c = await configOf(L.image, L.rules.config);
-      if (c) {
-        runAutomapper(T, null, c.conf, SEED, -1);
-        index = c.index;
-        for (let i = 0; i < n; i++) if (!inMask(i)) { T.tiles[i * 4] = 0; T.tiles[i * 4 + 1] = 0; }
-      }
-    }
-    built.push({ k: { label: L.name }, p: { color: L.color }, T, index, im: await styleImage(t, L.image), seed: SEED, W, H });
-  }
-  return built;
-}
-
-// a style's tileset: its PNG from the style folder, embedded in the map; external ones stay a name
-const styleImages = new Map();
-function styleImage(t, name) {
-  const info = (t.images || {})[name] || { external: true, width: 1024, height: 1024 };
-  if (info.external) return Promise.resolve({ name, width: info.width, height: info.height, rgba: null });
-  const key = t.style + '/' + info.file;
-  if (!styleImages.has(key)) {
-    styleImages.set(key, loadImage('/styles/' + encodeURIComponent(t.style) + '/' + encodeURIComponent(info.file)).then((im) => {
-      const c = document.createElement('canvas');
-      c.width = im.width; c.height = im.height;
-      const g = c.getContext('2d');
-      g.drawImage(im, 0, 0);
-      return { name, width: im.width, height: im.height, rgba: new Uint8Array(g.getImageData(0, 0, c.width, c.height).data.buffer) };
-    }));
-  }
-  return styleImages.get(key);
-}
-
-// amazing_freeze's corner configs, read from its rules: "> Round" = inside, "< Round" = outside
-let CORNERS = { inside: [], outside: [] };
-async function loadCorners() {
-  const confs = await loadRules(AF);
-  const of = (c) => confs.map((x) => x.name).filter((n) => n.startsWith(c + ' ')).map((n) => [n, n.slice(2)]);
-  CORNERS = { inside: of('>'), outside: of('<') };
-}
-const defaultChoice = (t) => (t.style ? {} : { hook: t.hook.cfgs[0], unhook: t.unhook, inside: t.freeze.inside, outside: t.freeze.outside });
-const isDefault = (t, ch) => Object.entries(defaultChoice(t)).every(([k, v]) => ch[k] === v);
-
-// preset + chosen variants -> how each kind is drawn
-function resolve(t, ch) {
-  if (t.style) return { name: t.name, style: t.style, layers: t.layers, images: t.images };
-  const chain = [t.freeze.base, ch.inside, ch.outside];
-  const same = (color) => pick(AF, chain, color, 9);
-  return {
-    name: t.name,
-    hook: pick(t.hook.img, ch.hook),
-    unhook: pick('generic_unhookable', ch.unhook),
-    death: DEATH,
-    freeze: pick(AF, chain, t.freeze.color, 'game'),
-    unfreeze: same([140, 255, 160, 120]),
-    tele: same([90, 170, 255, 150]),
-    tune: same([190, 120, 255, 120]),
-  };
-}
-
-// The preset map for the preview, grown by PAD tiles on every side: each layer of the game group repeats its edge
-// tiles outwards, so the preview has no hard border when zoomed out. core = where the real map is, in tiles.
-const PAD = 80;
-function padLayer(L, pad) {
-  const B = TILE_BYTES[L.kind], w = L.width, hh = L.height, W = w + 2 * pad, H = hh + 2 * pad;
-  const out = { ...L, width: W, height: H, tiles: new Uint8Array(W * H * B) };
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const sx = Math.max(0, Math.min(w - 1, x - pad)), sy = Math.max(0, Math.min(hh - 1, y - pad));
-    out.tiles.set(L.tiles.subarray((sy * w + sx) * B, (sy * w + sx + 1) * B), (y * W + x) * B);
-  }
-  return out;
-}
-function padMap(map, pad) {
-  const g0 = findGameLayer(map), G = g0.layer;
-  const layers = g0.group.layers.filter((l) => l.type === 'tiles' && l.width === G.width && l.height === G.height).map((l) => padLayer(l, pad));
-  return { ...map, groups: [{ ...g0.group, layers }], core: { x: pad, y: pad, w: G.width, h: G.height } };
-}
-
-// one map is the stage of every preset's preview: web/presets/platform.map. Its game layer is what the presets
-// draw; its own tile layers are the Grass preset drawn by hand (shown for a preset with drawn: true and no changes)
-let platform = null;
-function platformMap() {
-  if (!platform) platform = fetch('presets/platform.map').then((r) => r.arrayBuffer()).then(loadMap).then((m) => padMap(m, PAD));
-  return platform;
-}
-
-// ---------------------------------------------------------------- data
-
-const atlasCache = new Map();
-function atlas(name) {
-  if (!atlasCache.has(name)) atlasCache.set(name, loadImage('/mapres/' + encodeURIComponent(name) + '.png').catch(() => null));
-  return atlasCache.get(name);
-}
-
-// pixels of a tileset, for images that are not part of DDNet and must be embedded in the map
-async function rgbaOf(name) {
-  const im = await atlas(name);
-  const c = document.createElement('canvas');
-  c.width = im.width; c.height = im.height;
-  const g = c.getContext('2d');
-  g.drawImage(im, 0, 0);
-  return new Uint8Array(g.getImageData(0, 0, c.width, c.height).data.buffer);
-}
-
-async function configOf(image, name) {
-  const confs = await loadRules(image);
-  const i = confs.findIndex((c) => c.name === name);
+// a config of a rules file, by name or by index
+async function configOf(rules, name) {
+  const confs = await loadRules(rules);
+  const i = typeof name === 'number' ? (name < confs.length ? name : -1) : confs.findIndex((c) => c.name === name);
   return i >= 0 ? { index: i, conf: confs[i] } : null;
 }
+
+// ---------------------------------------------------------------- map data
 
 function physicsLayer(map, kind) {
   for (const g of map.groups) for (const l of g.layers) if (l.kind === kind) return l;
   return null;
 }
+// tele and tune keep the tile type in their second byte
+const tileOf = (L, x, y) => L.tiles[(y * L.width + x) * TILE_BYTES[L.kind] + (L.kind === 'tele' || L.kind === 'tune' ? 1 : 0)];
 
-// a game-layer-like grid (4 bytes a tile) with index 1 where the map has this kind, in the window x0,y0,w,h.
-// raw: copy the game layer as it is instead
-function sourceGrid(map, kind, x0, y0, w, hgt, raw = false) {
+// a game-layer-like grid (4 bytes a tile) with index 1 where the map has this kind. raw: the game layer as it is
+function sourceGrid(map, kind, w, hgt, raw = false) {
   const L = physicsLayer(map, kind.src);
   const out = { width: w, height: hgt, tiles: new Uint8Array(w * hgt * 4), count: 0 };
   if (!L) return out;
-  const stride = kind.src === 'game' ? 4 : 2, at = kind.src === 'game' ? 0 : 1;
-  for (let y = 0; y < hgt; y++) for (let x = 0; x < w; x++) {
-    const sx = x0 + x, sy = y0 + y;
-    if (sx >= L.width || sy >= L.height) continue;
-    const v = L.tiles[(sy * L.width + sx) * stride + at];
-    if (raw) out.tiles[(y * w + x) * 4] = v;
-    else if (v && (!kind.ids || kind.ids.includes(v))) { out.tiles[(y * w + x) * 4] = 1; out.count++; }
+  // a physics layer whose tiles take cells away (unhook: not where front has hookthrough)
+  // and one that must also have one of its tiles there (hookthrough: front 66 on top of unhook)
+  const NOT = kind.not && physicsLayer(map, kind.not.src), ONLY = kind.only && physicsLayer(map, kind.only.src);
+  const table = (ids) => { const t = new Uint8Array(256); if (ids) for (const i of ids) t[i] = 1; else t.fill(1, 1); return t; };
+  const want = table(kind.ids), notT = kind.not && table(kind.not.ids), onlyT = kind.only && table(kind.only.ids);
+  const has = (X, T, x, y) => !!X && x < X.width && y < X.height && T[tileOf(X, x, y)] === 1;
+  const B = TILE_BYTES[L.kind], at = L.kind === 'tele' || L.kind === 'tune' ? 1 : 0, T = L.tiles;
+  for (let y = 0; y < Math.min(hgt, L.height); y++) for (let x = 0; x < Math.min(w, L.width); x++) {
+    const v = T[(y * L.width + x) * B + at], o = (y * w + x) * 4;
+    if (raw) { out.tiles[o] = v; continue; }
+    if (!v || !want[v]) continue;
+    if ((notT && has(NOT, notT, x, y)) || (onlyT && !has(ONLY, onlyT, x, y))) continue;
+    out.tiles[o] = 1; out.count++;
   }
   return out;
-}
-
-function kindsOnMap(map) {
-  const game = findGameLayer(map);
-  const w = game ? game.layer.width : 0, hh = game ? game.layer.height : 0;
-  const has = {};
-  for (const k of KINDS) {
-    const L = physicsLayer(map, k.src);
-    has[k.key] = !!L && sourceGrid(map, k, 0, 0, L.width || w, L.height || hh).count > 0;
-  }
-  return has;
 }
 
 // tile index to draw the layer with before automapping: 1, or the first tile the config keeps when its
@@ -237,59 +199,180 @@ function fillTile(conf) {
   return 1;
 }
 
-// the tiles of one design layer: automapped from the source grid, or index 1 for plain layers.
-// p.cfg may be a list of configs run in order; the layer keeps the last one.
-async function buildTiles(map, kind, p, src, seed, win) {
-  const T = { width: src.width, height: src.height, tiles: new Uint8Array(src.width * src.height * 4) };
-  if (p.plain) { T.tiles.set(src.tiles); return { T, index: -1 }; }
-  const names = Array.isArray(p.cfg) ? p.cfg : [p.cfg];
-  const cs = (await Promise.all(names.map((n) => configOf(p.img, n)))).filter(Boolean);
+// the tiles of one kind: the layer starts as the shape of the kind and the configs run on it, like a hand-drawn
+// layer in DDNet. Returns { T, index } (index = the last config, kept on the layer for re-running it later).
+async function buildKind(map, k, s, src) {
+  const T = { width: src.width, height: src.height, tiles: new Uint8Array(src.tiles.length) };
+  const ts = TILESETS[s.ts];
+  if (ts.plain) { T.tiles.set(src.tiles); return { T, index: -1 }; }
+  const names = [...(k.pre ? [k.pre] : []), s.base, ...ts.mods.map((m) => s.mods[m.section]).filter((v) => v != null)].filter((v) => v != null);
+  const cs = (await Promise.all(names.map((n) => configOf(ts.rules, n)))).filter(Boolean);
   if (!cs.length) { T.tiles.set(src.tiles); return { T, index: -1 }; }
-  if (p.input === 'game') T.tiles.set(sourceGrid(map, kind, win.x0, win.y0, win.w, win.h, true).tiles);
+  const game = ts.kindFill && k.fill === 'game';
+  if (game) T.tiles.set(sourceGrid(map, k, src.width, src.height, true).tiles);
   else {
-    // the layer starts as the shape of the source and the rules run on it, like a hand-drawn layer in DDNet.
-    // Some rules first clear every tile that is not one of their own "fill" tiles, so draw with one of those.
-    const fill = p.input || fillTile(cs[0].conf);
+    // some rules first clear every tile that is not one of their own "fill" tiles, so draw with one of those
+    const fill = ts.kindFill ? k.fill : fillTile(cs[0].conf);
     for (let i = 0; i < src.tiles.length; i += 4) T.tiles[i] = src.tiles[i] ? fill : 0;
   }
-  for (const c of cs) runAutomapper(T, null, c.conf, seed, -1);
-  // keep the layer to where the kind is; a copy of the game layer is left as the rules made it, since
-  // amazing_freeze also fills the hook tiles next to freeze (the freeze goes on under the hook's rounded edges)
-  if (p.input !== 'game') for (let i = 0; i < src.tiles.length; i += 4) if (!src.tiles[i]) { T.tiles[i] = 0; T.tiles[i + 1] = 0; }
+  for (const c of cs) runAutomapper(T, null, c.conf, SEED, -1);
+  // keep the layer to where the kind is. Not for amazing_freeze: its inside corners are drawn on the empty cell in
+  // the corner, and its freeze (a copy of the game layer) also fills the hook tiles next to freeze (the freeze goes
+  // on under the hook's rounded edges)
+  if (!ts.kindFill) for (let i = 0; i < src.tiles.length; i += 4) if (!src.tiles[i]) { T.tiles[i] = 0; T.tiles[i + 1] = 0; }
   return { T, index: cs[cs.length - 1].index };
+}
+
+const atlasCache = new Map();
+function atlas(name) {
+  if (!atlasCache.has(name)) atlasCache.set(name, loadImage('/mapres/' + encodeURIComponent(name) + '.png').catch(() => null));
+  return atlasCache.get(name);
+}
+// a map image for a tileset. The preview only names it (the renderer loads /mapres/<name>.png itself); for Apply
+// the ones that are not part of DDNet get their pixels, to be embedded in the map
+const imageCache = new Map();
+function mapImage(name, pixels = false) {
+  const key = name + (pixels ? '|px' : '');
+  if (!imageCache.has(key)) imageCache.set(key, atlas(name).then((im) => {
+    if (!im) return null;
+    let rgba = null;
+    if (pixels && EMBED.has(name)) {
+      const c = document.createElement('canvas');
+      c.width = im.width; c.height = im.height;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(im, 0, 0);
+      rgba = new Uint8Array(g.getImageData(0, 0, c.width, c.height).data.buffer);
+    }
+    return { name, width: im.width, height: im.height, external: !rgba, rgba };
+  }));
+  return imageCache.get(key);
+}
+
+// ---------------------------------------------------------------- the design of one map
+
+// Everything that depends only on the map and the settings of a kind is computed once: the masks and the automapped
+// tiles (a colour change or switching another kind off does not run the rules again).
+function designer(map) {
+  const game = findGameLayer(map).layer, W = game.width, H = game.height;
+  const masks = Object.fromEntries(KINDS.map((k) => [k.key, sourceGrid(map, k, W, H)]));
+  const has = Object.fromEntries(KINDS.map((k) => [k.key, masks[k.key].count > 0]));
+  // a kind can read other tiles with some tilesets (hook with amazing_freeze: without the unhook)
+  const variants = new Map();
+  const maskOf = (k, ts) => {
+    const v = k.byTileset && k.byTileset[ts];
+    if (!v) return masks[k.key];
+    const key = k.key + '|' + ts;
+    if (!variants.has(key)) variants.set(key, sourceGrid(map, { ...k, ...v }, W, H));
+    return variants.get(key);
+  };
+  const tiles = new Map();
+  const cleared = new WeakMap(); // tiles of a kind with the hookthrough cells taken out, by the kind's tiles
+  const tilesOf = (k, s) => {
+    const key = k.key + '|' + JSON.stringify([s.ts, s.base, s.mods]);
+    if (!tiles.has(key)) tiles.set(key, buildKind(map, k, s, maskOf(k, s.ts)));
+    return tiles.get(key);
+  };
+  // the layers of a design: [{ name, color, T, index, img }], bottom -> top
+  async function layers(d) {
+    const out = [];
+    for (const k of KINDS) {
+      const s = d[k.key];
+      if (!s || !s.on || !has[k.key] || !visible(d, k.key)) continue;
+      const fresh = !tiles.has(k.key + '|' + JSON.stringify([s.ts, s.base, s.mods]));
+      const { T, index } = await tilesOf(k, s);
+      if (fresh) await new Promise((r) => setTimeout(r)); // let the window breathe between two heavy kinds
+      if (!T.tiles.some((v, i) => !(i & 3) && v)) continue; // nothing to draw (e.g. no thin hook)
+      TILESETS[s.ts].layers.forEach((L, i) => out.push({ key: k.key, name: layerName(k, s.ts, i), color: s.colors[i], T, index, img: index >= 0 ? L.img : null }));
+    }
+    // hookthrough is the top layer and usually see-through: nothing of the other layers stays under it
+    const ht = out.find((b) => b.key === 'hookthrough');
+    if (ht) {
+      for (const b of out) {
+        if (b.T === ht.T) continue;
+        const key = b.T, prev = cleared.get(key);
+        if (!prev || prev.ht !== ht.T) {
+          const c = { ...b.T, tiles: b.T.tiles.slice() };
+          for (let i = 0; i < c.tiles.length; i += 4) if (ht.T.tiles[i]) { c.tiles[i] = 0; c.tiles[i + 1] = 0; }
+          cleared.set(key, { ht: ht.T, c });
+        }
+        b.T = cleared.get(key).c;
+      }
+    }
+    return out;
+  }
+  return { W, H, has, layers };
+}
+// Thin hook is only there for a hook tileset that can't draw 1 tile thick blocks
+const visible = (d, key) => key !== 'hookfix' || (!!d.hook && d.hook.on && !!TILESETS[d.hook.ts].thin);
+const layerName = (k, ts, i) => (TILESETS[ts].layers[i].name ? k.label + ' ' + TILESETS[ts].layers[i].name : k.label);
+
+// the "Design" group of the built layers; adds the images it needs to the map (image objects from mapImage, or copies)
+// reuse: layers made before, by tiles + name + image (the preview: an unchanged layer is not uploaded to the GPU again)
+async function designGroup(map, built, W, H, copy = false, reuse = null) {
+  const grp = newGroup('Design');
+  for (const b of built) {
+    let ii = -1;
+    const im = b.img && (await mapImage(b.img, copy));
+    if (im) {
+      ii = map.images.findIndex((i) => i.name === im.name);
+      if (ii < 0) { map.images.push(copy ? { ...im } : im); ii = map.images.length - 1; }
+    }
+    if (reuse) {
+      let byName = reuse.get(b.T);
+      if (!byName) reuse.set(b.T, (byName = new Map()));
+      const k = b.name + '|' + ii, old = byName.get(k);
+      if (old) { old.color = [...b.color]; grp.layers.push(old); continue; }
+      byName.set(k, null);
+    }
+    const L = newTileLayer('tiles', W, H, b.name);
+    L.image = ii;
+    L.color = [...b.color];
+    L.tiles.set(b.T.tiles);
+    if (b.index >= 0) L.automapper = { config: b.index, seed: SEED, flags: 0 };
+    if (reuse) reuse.get(b.T).set(b.name + '|' + ii, L);
+    grp.layers.push(L);
+  }
+  return grp;
 }
 
 // ---------------------------------------------------------------- preview
 
-// The big preview is a small view on the editor's own renderer (render.js), showing the preset map: as it is, or
-// with its drawing replaced by the Design group the chosen variants make. The preset map is padded by repeating its edge tiles.
-function previewOf(pm, built) {
-  const g0 = findGameLayer(pm);
-  if (!built) return pm;
-  const map = { ...pm, images: [], groups: [{ ...g0.group, layers: [g0.layer] }] };
-  map.groups.push(designGroup(map, built));
-  return map;
+// The player's map for the preview: its BG group(s) and the game group with only the game layer (not drawn, it only
+// places the camera), then the Design group.
+// (no group called BG / Background: the quad-only groups before the game group, like DDNet's first group)
+const isBg = (g) => /^\s*(bg|background)\b/i.test(g.name || '');
+function stageOf(map) {
+  const g0 = findGameLayer(map), gi = map.groups.indexOf(g0.group);
+  let groups = map.groups.filter((g) => g !== g0.group && isBg(g));
+  if (!groups.length) groups = map.groups.slice(0, gi).filter((g) => g.layers.length && g.layers.every((l) => l.type === 'quads'));
+  return { ...map, images: [...map.images], groups: [...groups, { ...g0.group, layers: [g0.layer] }] };
 }
 
-function mountViewer(box) {
+// where the camera starts: the first spawn (192, then the team spawns 193, 194), else the middle of the map
+function spawnOf(game) {
+  for (const id of [192, 193, 194]) {
+    for (let i = 0; i < game.width * game.height; i++) if (game.tiles[i * 4] === id) return [(i % game.width + 0.5) * TILE, (Math.floor(i / game.width) + 0.5) * TILE];
+  }
+  return [game.width * TILE / 2, game.height * TILE / 2];
+}
+
+// a small view on the editor's own renderer (render.js): wheel zooms, the middle mouse button moves
+function mountViewer(box, start) {
   const canvas = h('canvas', { class: 'dz-gl' });
   box.append(canvas);
   const r = new Renderer(canvas);
-  const opts = { background: [0.29, 0.42, 0.56, 1], parallax: true, parallaxZoom: false, clip: true, showEntities: false, entitiesAlpha: 1, time: 0 };
-  const cam = { x: 0, y: 0, zoom: 1 };
-  let map = null, fit = 1, raf = 0;
+  const opts = { background: [0.29, 0.42, 0.56, 1], parallax: true, parallaxZoom: true, clip: true, showEntities: false, entitiesAlpha: 1, time: 0 };
+  const cam = { x: start[0], y: start[1], zoom: 0 };
+  let map = null, raf = 0;
   const W = () => box.clientWidth || 1, H = () => box.clientHeight || 1;
   const size = () => { const g = map && findGameLayer(map).layer; return g ? [g.width * TILE, g.height * TILE] : [1, 1]; };
-  const core = () => { const c = map.core; return c ? [c.x * TILE, c.y * TILE, c.w * TILE, c.h * TILE] : [0, 0, ...size()]; };
-  // zoom: from 4 times smaller than "whole map" to 12 times closer. The centre stays over the real map and the
-  // view inside the padded map, so the edge is never seen.
+  // zoom: from the whole map (and a bit more) to 4 screen pixels per map pixel; the centre stays over the map
   const clamp = () => {
-    const [mw, mh] = size(), [cx, cy, cw, ch] = core();
-    fit = Math.min(W() / cw, H() / ch);
-    cam.zoom = Math.max(fit / 4, W() / mw, H() / mh, Math.min(fit * 12, cam.zoom));
-    const hw = W() / 2 / cam.zoom, hh = H() / 2 / cam.zoom;
-    cam.x = Math.max(hw, Math.min(mw - hw, Math.max(cx, Math.min(cx + cw, cam.x))));
-    cam.y = Math.max(hh, Math.min(mh - hh, Math.max(cy, Math.min(cy + ch, cam.y))));
+    const [mw, mh] = size(), fit = Math.min(W() / mw, H() / mh);
+    if (!cam.zoom) cam.zoom = Math.max(fit, W() / (44 * TILE)); // about 44 tiles across around the spawn
+    cam.zoom = Math.max(Math.min(fit / 1.5, 1), Math.min(4, cam.zoom));
+    cam.x = Math.max(0, Math.min(mw, cam.x));
+    cam.y = Math.max(0, Math.min(mh, cam.y));
   };
   const draw = () => {
     if (raf) return;
@@ -299,9 +382,9 @@ function mountViewer(box) {
   new ResizeObserver(draw).observe(box);
   box.addEventListener('wheel', (e) => {
     e.preventDefault();
+    if (!map) return;
     const b = box.getBoundingClientRect(), sx = e.clientX - b.left - W() / 2, sy = e.clientY - b.top - H() / 2;
     const wx = cam.x + sx / cam.zoom, wy = cam.y + sy / cam.zoom;
-    if (!map) return;
     cam.zoom *= Math.pow(1.0015, -e.deltaY);
     clamp();
     cam.x = wx - sx / cam.zoom; cam.y = wy - sy / cam.zoom;
@@ -318,11 +401,11 @@ function mountViewer(box) {
   });
   box.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
   return {
-    // a new map keeps the camera when it is the same size (switching variants), else shows the whole map
-    show(m) {
-      const first = !map;
-      map = m;
-      if (first) { const [cx, cy, cw, ch] = core(); cam.x = cx + cw / 2; cam.y = cy + ch / 2; cam.zoom = Math.min(W() / cw, H() / ch); }
+    show(m) { map = m; draw(); }, // the camera stays where it is
+    // set the colours of the Design group's layers by name
+    recolor(by) {
+      const g = map && map.groups.find((x) => x.name === 'Design');
+      if (g) for (const L of g.layers) if (by[L.name]) L.color = [...by[L.name]];
       draw();
     },
     close() { const x = r.gl.getExtension('WEBGL_lose_context'); if (x) x.loseContext(); },
@@ -331,186 +414,159 @@ function mountViewer(box) {
 
 // ---------------------------------------------------------------- apply
 
-// the design layers of a map: one per kind that the map has and that is turned on
-async function buildLayers(map, theme, seed, enabled) {
-  if (theme.style) return buildStyleLayers(map, theme, enabled);
-  const game = findGameLayer(map);
-  const W = game.layer.width, H = game.layer.height;
-  const built = [];
-  for (const k of KINDS) {
-    if (!enabled[k.key]) continue;
-    const src = sourceGrid(map, k, 0, 0, W, H);
-    if (!src.count) continue;
-    const p = theme[k.key];
-    const { T, index } = await buildTiles(map, k, p, src, seed, { x0: 0, y0: 0, w: W, h: H });
-    let im = null;
-    if (index >= 0) {
-      const a = await atlas(p.img);
-      if (a) im = { name: p.img, width: a.width, height: a.height, rgba: EMBED.has(p.img) ? await rgbaOf(p.img) : null };
-    }
-    built.push({ k, p, T, index, im, seed, W, H });
-  }
-  return built;
-}
-
-// the "Design" group of the built layers; adds the images it needs to the map
-function designGroup(map, built) {
-  const grp = newGroup('Design');
-  for (const b of built) {
-    let ii = -1;
-    if (b.im) {
-      ii = map.images.findIndex((i) => i.name === b.im.name);
-      if (ii < 0) { map.images.push({ name: b.im.name, width: b.im.width, height: b.im.height, external: !b.im.rgba, rgba: b.im.rgba }); ii = map.images.length - 1; }
-    }
-    const L = newTileLayer('tiles', b.W, b.H, b.k.label);
-    L.image = ii;
-    L.color = [...b.p.color];
-    L.tiles.set(b.T.tiles);
-    if (b.index >= 0) L.automapper = { config: b.index, seed: b.seed, flags: 0 };
-    grp.layers.push(L);
-  }
-  return grp;
-}
-
-async function applyTheme(ed, theme, seed, enabled, mode) {
+async function applyDesign(ed, dz, d, name, mode) {
   const game = findGameLayer(ed.map);
-  const built = await buildLayers(ed.map, theme, seed, enabled);
-  if (!built.length) { ed.status('Design it!: the map has no hook, unhook, freeze, death, tele or tune tiles'); return false; }
-  const need = new Set(built.filter((b) => b.im && !ed.map.images.some((i) => i.name === b.im.name)).map((b) => b.im.name));
-  const gi0 = ed.map.groups.indexOf(game.group);
-  const old = mode === 'replace' ? gi0 + 1 : -1;
+  const built = await dz.layers(d);
+  if (!built.length) { ed.status('Design it!: nothing to draw'); return false; }
+  const need = new Set(built.filter((b) => b.img && !ed.map.images.some((i) => i.name === b.img)).map((b) => b.img));
   if (ed.map.images.length + need.size > 64) { ed.status('Design it!: a map can hold at most 64 images'); return false; }
-  ed.editStructure(`Design it! (${theme.name})`, () => {
-    if (old >= 0) ed.map.groups.splice(old, 1);
-    const grp = designGroup(ed.map, built);
+  const gi0 = ed.map.groups.indexOf(game.group);
+  const imgs = [...ed.map.images];
+  const tmp = { images: imgs };
+  const grp = await designGroup(tmp, built, dz.W, dz.H, true);
+  ed.editStructure(`Design it! (${name})`, () => {
+    if (mode === 'replace') ed.map.groups.splice(gi0 + 1, 1);
+    ed.map.images.splice(0, ed.map.images.length, ...imgs);
     ed.map.groups.splice(gi0 + 1, 0, grp);
     ed.sel = { g: gi0 + 1, l: grp.layers.length - 1 };
   });
-  ed.status(`Design it!: ${theme.name}, ${built.length} layers`);
+  ed.status(`Design it!: ${name}, ${built.length} layers`);
   return true;
 }
 
-// ---------------------------------------------------------------- gallery
+// "Replace / Add another / Cancel" when there is a Design group above Game already
+function askMode(ed, game) {
+  const next = ed.map.groups[ed.map.groups.indexOf(game.group) + 1];
+  if (!next || !/^Design/.test(next.name)) return Promise.resolve('add');
+  return new Promise((res) => {
+    let done = false;
+    const m = modal('Design group exists', h('div', { style: { maxWidth: '380px' } }, 'There is already a Design group above Game. Replace it or add one more?'), [
+      ['Cancel', () => { done = true; res(null); }],
+      ['Add another', () => { done = true; res('add'); }],
+      ['Replace', () => { done = true; res('replace'); }, 'accent'],
+    ]);
+    const obs = new MutationObserver(() => { if (!m.box.isConnected) { obs.disconnect(); if (!done) res(null); } });
+    obs.observe(document.getElementById('modal-root'), { childList: true });
+  });
+}
+
+// ---------------------------------------------------------------- window
 
 export async function openDesign(ed) {
   const game = findGameLayer(ed.map);
   if (!game) { ed.status('Design it!: the map has no Game layer'); return; }
-  await loadCorners();
-  const presets = [...PRESETS, ...(await stylePresets())];
-  const has = kindsOnMap(ed.map);
-  const st = { theme: 0, choice: presets.map(defaultChoice), picks: [], enabled: Object.fromEntries(KINDS.map((k) => [k.key, has[k.key]])) };
-  const grid = h('div', { class: 'dz-grid' });
+  for (const ts of Object.keys(TILESETS)) if (!TILESETS[ts].plain) SECS[ts] = await rulesSections(ts);
+  const dz = designer(ed.map);
+  const stage = stageOf(ed.map);
+  // every tileset image in the preview map from the start, so a layer keeps its image index between rebuilds
+  for (const T of Object.values(TILESETS)) for (const L of T.layers) {
+    const im = L.img && (await mapImage(L.img));
+    if (im && !stage.images.includes(im)) stage.images.push(im);
+  }
+  const reuse = new WeakMap();
+  const kinds = KINDS.filter((k) => dz.has[k.key]);
+
+  // the design: per kind { on, ts, base, mods, colors }, filled in by a preset
+  let d = {}, preset = 0;
+  const load = (i) => {
+    preset = i;
+    d = Object.fromEntries(KINDS.map((k) => {
+      const p = PRESETS[i].kinds[k.key];
+      const ts = p ? p.ts : CHOICES[k.key][0];
+      return [k.key, { on: !!p, ...kindSettings(k, ts, p || {}, p && p.colors) }];
+    }));
+  };
+
+  // ---- Presets (left)
+  const cards = PRESETS.map((t, i) => h('button', { class: 'dz-card', onclick: () => { load(i); paint(); refresh(); } },
+    h('div', { class: 'dz-pic' }, h('img', { src: t.card, alt: '', draggable: 'false', onerror: (e) => { e.target.remove(); } })),
+    h('div', { class: 'dz-name' }, t.name)));
+  const presets = h('div', { class: 'dz-presets' }, h('div', { class: 'dz-h' }, 'Presets'), h('div', { class: 'dz-cards' }, ...cards));
+
+  // ---- preview (middle)
   const big = h('div', { class: 'dz-big', title: 'Wheel: zoom, middle mouse: move' });
-  const viewer = mountViewer(big);
-  const spin = h('div', { class: 'dz-spin dz-busy' });
-  const rows = h('div', { class: 'dz-rows' });
-  const title = h('div', { class: 'dz-title' });
+  const viewer = mountViewer(big, spawnOf(game.layer));
+  const spin = h('div', { class: 'dz-spin' }, h('i'), h('span', {}, 'Generating preview of your map...'));
   let token = 0;
-  const update = (i) => { st.picks[i] = resolve(presets[i], st.choice[i]); };
-  presets.forEach((_, i) => update(i));
-  const picture = (t) => (t.style && !t.card ? h('span', { class: 'dz-one' }, t.name)
-    : h('img', { src: t.card || 'presets/' + t.file + '.png', alt: t.name, draggable: 'false' }));
-  const hint = h('div', { class: 'dz-hint' });
-
-  const cards = presets.map((t, i) => {
-    const card = h('button', { class: 'dz-card', onclick: () => choose(i) }, h('div', { class: 'dz-pic' }, picture(t)), h('div', { class: 'dz-name' }, t.name));
-    grid.append(card);
-    return { card };
-  });
-
-  // the preset map: its own layers as they are, or automapped again with the chosen variants
-  async function showBig() {
-    const i = st.theme, t = presets[i], my = ++token;
+  async function refresh() {
+    const my = ++token;
     big.append(spin);
-    const pm = await platformMap();
-    const all = Object.fromEntries(KINDS.map((k) => [k.key, true]));
     let built;
-    try {
-      built = t.drawn && isDefault(t, st.choice[i]) ? null : await buildLayers(pm, st.picks[i], SEED, t.style ? st.enabled : all);
-    } catch (e) {
-      if (my === token) { spin.remove(); ed.status('Design it!: ' + e.message); }
-      return;
-    }
+    try { built = await dz.layers(d); } catch (e) { if (my === token) { spin.remove(); ed.status('Design it!: ' + e.message); } return; }
     if (my !== token) return;
-    viewer.show(previewOf(pm, built));
+    const m = { ...stage, images: [...stage.images], groups: [...stage.groups] };
+    m.groups.push(await designGroup(m, built, dz.W, dz.H, false, reuse));
+    if (my !== token) return;
+    viewer.show(m);
     spin.remove();
   }
+  const recolor = () => {
+    const by = {};
+    for (const k of KINDS) { const s = d[k.key]; s.colors.forEach((c, i) => { by[layerName(k, s.ts, i)] = c; }); }
+    viewer.recolor(by);
+  };
 
-  function renderRows() {
-    const t = st.picks[st.theme];
-    title.textContent = t.name;
-    if (t.style) {
-      hint.textContent = 'Learned from a finished map: every layer is drawn the way that map draws the same hook, freeze and air around a tile, decoration first, then the freeze that goes with it. Glow layers use the automapper. The tilesets are embedded.';
-      rows.replaceChildren(...[...t.layers].reverse().map((L) => {
-        const key = 'style:' + L.name;
-        const on = check(st.enabled[key] !== false, (v) => { st.enabled[key] = v; showBig(); });
-        const col = L.color;
-        const sw = h('i', { style: { background: `rgba(${col[0]},${col[1]},${col[2]},${Math.max(0.35, col[3] / 255)})` } });
-        return h('div', { class: 'dz-row' }, on, h('span', { class: 'dz-kind' }, L.name), h('div', { class: 'dz-ctl' }, sw, h('span', { class: 'dz-img' }, L.image),
-          L.rules ? h('span', { class: 'dz-one' }, L.rules.config) : null));
-      }));
-      return;
-    }
-    hint.textContent = 'Preview shows the preset\'s own sample map. Each layer keeps its automapper config and seed, so it can be re-run later from the layer properties.';
-    rows.replaceChildren(...[...KINDS].reverse().map((k) => {
-      const on = check(st.enabled[k.key], (v) => { st.enabled[k.key] = v; });
-      if (!has[k.key]) on.disabled = true;
-      const p = t[k.key], col = p.color, ch = st.choice[st.theme], th = presets[st.theme];
-      const sw = h('i', { style: { background: `rgba(${col[0]},${col[1]},${col[2]},${Math.max(0.35, col[3] / 255)})` } });
-      const set = (key) => (v) => { ch[key] = v; update(st.theme); renderRows(); showBig(); };
-      const sel = (opts, key) => (opts.length > 1 ? select(opts, ch[key], set(key)) : h('span', { class: 'dz-one' }, opts[0][1]));
-      let what;
-      if (k.key === 'hook') what = [h('span', { class: 'dz-img' }, th.hook.img), sel(th.hook.cfgs.map((n) => [n, n]), 'hook')];
-      else if (k.key === 'unhook') what = [h('span', { class: 'dz-img' }, 'generic_unhookable'), sel(UNHOOKS.map((n) => [n, n]), 'unhook')];
-      else if (k.key === 'freeze') what = [h('span', { class: 'dz-img' }, AF),
-        h('span', { class: 'dz-sub', title: 'Inside corners (amazing_freeze)' }, 'Inside', sel(CORNERS.inside, 'inside')),
-        h('span', { class: 'dz-sub', title: 'Outside corners (amazing_freeze)' }, 'Outside', sel(CORNERS.outside, 'outside'))];
-      else if (k.key === 'death') what = [h('span', { class: 'dz-one' }, p.cfg)];
-      else what = [h('span', { class: 'dz-one' }, 'same as freeze, tinted')];
-      const ctl = h('div', { class: 'dz-ctl' }, sw, ...what);
-      return h('div', { class: 'dz-row' + (has[k.key] ? '' : ' off') + (k.key === 'freeze' ? ' wide' : '') }, on, h('span', { class: 'dz-kind' }, k.label), ctl,
-        has[k.key] ? null : h('span', { class: 'dz-none' }, 'not on map'));
+  // ---- settings (right): one block per kind on the map, top layer first
+  const list = h('div', { class: 'dz-list' });
+  function block(k) {
+    const s = d[k.key], T = TILESETS[s.ts];
+    const change = () => { paint(); refresh(); };
+    const on = check(s.on, (v) => { s.on = v; change(); });
+    const sws = h('span', { class: 'dz-sws' }, ...s.colors.map((c, i) => {
+      const b = rgba(c, (v) => { s.colors[i] = v; recolor(); })[0];
+      b.classList.add('dz-sw');
+      return b;
     }));
+    const head = h('div', { class: 'dz-bhead' }, on, h('span', { class: 'dz-kind' }, k.label), sws);
+    const blk = h('div', { class: 'dz-block' + (s.on ? '' : ' off') }, head);
+    if (!s.on) return blk;
+    const row = (label, ctl) => h('div', { class: 'dz-opt' }, h('span', {}, label), ctl);
+    const tsOpts = CHOICES[k.key].map((x) => [x, TILESETS[x].label]);
+    // a new tileset takes the colours a preset gives this kind with that tileset (meadow's dark ground colour on flat
+    // amazing_freeze blocks would look like an empty background), else keeps the current ones
+    const tsCtl = select(tsOpts, s.ts, (v) => {
+      const from = PRESETS.map((t) => t.kinds[k.key]).find((p) => p && p.ts === v);
+      d[k.key] = { on: true, ...kindSettings(k, v, {}, from ? from.colors : s.colors) };
+      change();
+    });
+    if (tsOpts.length < 2) tsCtl.disabled = true;
+    blk.append(row('Tileset', tsCtl));
+    const sec = SECS[s.ts] || {};
+    if (typeof s.base === 'number' && !T.base.fixed && (sec[T.base.section] || []).length > 1) {
+      blk.append(row('Style', select(sec[T.base.section].map(([i, n]) => [String(i), n]), String(s.base), (v) => { s.base = Number(v); change(); })));
+    }
+    for (const m of T.mods) {
+      if (!sec[m.section]) continue;
+      const opts = [['off', 'Off'], ...sec[m.section].map(([i, n]) => [String(i), n])];
+      blk.append(row(m.label, select(opts, s.mods[m.section] == null ? 'off' : String(s.mods[m.section]), (v) => { s.mods[m.section] = v === 'off' ? null : Number(v); change(); })));
+    }
+    return blk;
   }
-
-  function choose(i) {
-    st.theme = i;
-    cards.forEach((c, j) => c.card.classList.toggle('on', j === i));
-    renderRows();
-    showBig();
+  function paint() {
+    cards.forEach((c, j) => c.classList.toggle('on', j === preset));
+    const shown = [...kinds].reverse().filter((k) => visible(d, k.key));
+    list.replaceChildren(...(shown.length ? shown.map(block) : [h('div', { class: 'dz-empty' }, 'The map has no hook, freeze, death, tele or tune tiles.')]));
   }
 
   const apply = btn('Apply', async () => {
-    const next = ed.map.groups[ed.map.groups.indexOf(game.group) + 1];
-    let mode = 'add';
-    if (next && /^Design/.test(next.name)) {
-      mode = await new Promise((res) => {
-        let done = false;
-        const m = modal('Design group exists', h('div', { style: { maxWidth: '380px' } }, 'There is already a Design group above Game. Replace it or add one more?'), [
-          ['Cancel', () => { done = true; res(null); }],
-          ['Add another', () => { done = true; res('add'); }],
-          ['Replace', () => { done = true; res('replace'); }, 'accent'],
-        ]);
-        const obs = new MutationObserver(() => { if (!m.box.isConnected) { obs.disconnect(); if (!done) res(null); } });
-        obs.observe(document.getElementById('modal-root'), { childList: true });
-      });
-      if (!mode) return;
-    }
+    const mode = await askMode(ed, game);
+    if (!mode) return;
     apply.disabled = true;
-    try { if (await applyTheme(ed, st.picks[st.theme], SEED, st.enabled, mode)) m.close(); }
+    try { if (await applyDesign(ed, dz, d, PRESETS[preset].name, mode)) m.close(); }
     catch (e) { ed.status('Design it!: ' + e.message); }
     finally { apply.disabled = false; }
   }, { class: 'accent dz-apply' });
+  if (!kinds.length) apply.disabled = true;
 
-  const side = h('div', { class: 'dz-side' }, big, h('div', { class: 'dz-head' }, title), rows,
-    hint,
-    h('div', { class: 'dz-foot' }, apply));
-  const body = h('div', { class: 'dz' }, h('div', { class: 'dz-gal' }, grid), side);
+  const panel = h('div', { class: 'dz-panel' }, h('div', { class: 'dz-h' }, 'Customize'), list, h('div', { class: 'dz-foot' }, apply));
+  const body = h('div', { class: 'dz' }, presets, big, panel);
   const m = modal('Design it!', body);
   const obs = new MutationObserver(() => { if (!m.box.isConnected) { obs.disconnect(); viewer.close(); } });
   obs.observe(document.getElementById('modal-root'), { childList: true, subtree: true });
   m.box.classList.add('dz-modal');
-  choose(0);
+  load(0);
+  paint();
+  refresh();
 }
 
 // plugs Design it! into the editor: the big button on top of the Game layer's sheet (right click on the Game layer)
