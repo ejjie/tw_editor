@@ -38,6 +38,7 @@ EXCLUDE = [
     "config.json", "cache/*", "ddnet-server/*", "ddnet-server.part/*", "user-rules/*",
     "runtime/*", "runtime.new/*", "runtime.old/*", "version.json", "files.txt", "start.bat.new",
     "*.png",  # screenshots at the top; pictures in subfolders are listed in KEEP_PNG
+    "docs/*",  # README screenshots
     "requirements.txt",  # pip modules for the development folder; the runtime has them
     # Rules maker is paused (web/js/features.js): not shipped
     "rulesmaker.py", "web/js/rulesmaker.js", "web/js/ruleslearn.js",
@@ -183,7 +184,7 @@ def write_zip(path, entries):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--version", required=True, help="editor version, e.g. 1.0.0 (the git tag is v1.0.0)")
+    ap.add_argument("--version", help="editor version, e.g. 1.0.0 (the git tag is v1.0.0)")
     ap.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""),
                     help="owner/name on GitHub where updates come from (default: $GITHUB_REPOSITORY)")
     ap.add_argument("--out", default=str(ROOT / "dist"))
@@ -195,6 +196,8 @@ def main():
     if a.print_runtime:
         print(runtime_version())
         return
+    if not a.version:
+        ap.error("--version is required")
 
     ver = a.version.lstrip("v")
     rt = runtime_version()
