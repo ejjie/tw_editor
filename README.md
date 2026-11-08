@@ -6,7 +6,7 @@
 
 Open your `.map`, draw, press Ctrl+S, and it is saved back into the same file.
 On top of everything the DDNet editor does, it can design a whole map for you, turn pictures into quad art,
-animate quads with keys and test the map on a local server in one click.
+animate quads with keys and make your editing routine quite easier.
 
 [Quick start](#quick-start) · [Modules](#modules) · [For developers](#for-developers)
 
