@@ -1,69 +1,339 @@
-# TW Editor: a local DDNet map editor in the browser
+<div align="center">
 
-## Running (Windows)
-1. Install Python 3 (python.org, tick "Add python.exe to PATH" during setup).
-2. Double-click `start.bat`. The first time it installs the quad-art modules (numpy, pillow, opencv, mapbox-earcut, scipy).
-3. The browser opens `http://localhost:8765`. If another program already uses that port, the editor says so in its window, takes the next free port and remembers it in `config.json`, so it opens on the same address every time (the browser keeps the palette and the autosave per address). `--port <number>` picks one by hand. Chrome or Edge is recommended: there "Save" (Ctrl+S) writes straight back into the same .map file. Firefox downloads the map instead.
+# TW Editor
 
-Without `start.bat`: `python editor.py` (options `--port 9000`, `--no-browser`, `--keep-running`).
+**A fast, modern DDNet map editor that runs in your browser.**
 
-Closing the last editor tab stops `editor.py` and the test server about 8 seconds later (a page reload does not), and the `start.bat` window closes with it. If the window is closed first, Windows ends the test server too. `--keep-running` keeps the editor running without a tab.
+Open your `.map`, draw, press Ctrl+S, and it is saved back into the same file.
+On top of everything the DDNet editor does, it can design a whole map for you, turn pictures into quad art,
+animate quads with keys and test the map on a local server in one click.
 
-Standard images (mapres), entities and automapper rules are taken from the DDNet game folder (Steam is detected automatically, another folder can be set in "Edit → Editor settings"). If the game is not installed, they are downloaded once from the DDNet GitHub into `cache/`.
+![TW Editor with a map drawn by Design it!](docs/screenshots/editor.png)
 
-## Features
-- The last map, its unsaved changes, the view and the open tab come back after a page reload (stored in the browser). With Chrome/Edge, Ctrl+S still writes to the same file after asking for permission once.
-- Open and save DDNet .map files (envelopes with bezier curves, automapper settings, unknown UUID items are kept).
-- Groups and layers: create, delete, duplicate, drag and drop, order, visibility, parallax, offset, clipping, detail.
-- Tile and physics layers (Game, Front, Tele, Speedup, Switch, Tune) drawn with the DDNet editor pictures, with tele/switch/tune numbers and speedup arrows at their angle: tile picker while Space is held (the "Tile picker" button keeps it open until a tile is picked), brush from selection, flip and rotate the brush (N, M, R, T), rectangle fill (Shift), flood fill (Ctrl+Shift), destructive mode, tele/switch/tune numbers and speedup settings, DDNet tile validity rules, resize (Game resizes all physics layers together; a 3x3 anchor picks the sides to grow on, the middle grows on all sides and whatever is built stays in place: other layers get the same rows / columns added, quads and sound sources move, groups with other parallax get their offset adjusted, the camera follows; "Linked" also resizes every lined-up tile layer of the same size; a white dashed frame previews the new size while it is typed, Enter applies, Esc resets), border, construct and clean up game tiles. **Gores mode** (G or the Gores button on the top bar, `web/js/gores.js`): hookable tiles you paint get a freeze ring (8 neighbours), erasing hook leaves air and removes the freeze it had placed that has no hook next to it any more; air painted into a hook wall carves a path: the hook it touches turns into freeze while you draw, and that freeze stays (it is treated as hand-made); only tiles next to the edit change, so hook left without freeze on purpose stays that way. The editor remembers which freeze it placed only in the browser, freeze from a reopened .map file is treated as hand-made and never removed.
-- Automapper: DDNet .rules files, config, seed, reference layer, automatic mode.
-- **Design it!** (right click on the Game layer, `web/js/design.js`): a gallery of themes, one for each hook tileset (grass_main, ddnet_grass, desert_main, jungle_main, winter_main, ddnet_tiles, ddnet_walls, round_tiles), with previews of the part of your map around the camera. Inside a theme the hook config, the unhook config and the amazing_freeze style (Rounded / Sharp / Uneven) are chosen; Shuffle gives a new seed. Apply adds a "Design" group right above the Game group with one layer per kind found on the map: Freeze (alpha 100, bottom), Unfreeze, Death (plain red tiles), Tune (from the tune layer), Tele (from the tele layer), Unhook (generic_unhookable), Hook (top). Freeze is always `amazing_freeze`, run on a copy of the game layer so it also fills under the hook next to freeze; unfreeze, tele and tune use the same asset tinted. `amazing_freeze` is by mind, shipped in `extra-data/` and embedded into the map because it is not part of DDNet. Each layer keeps its config and seed. Front, speedup and switch layers are not used yet.
-- **Rules maker** (File → "New rules design", or the dock button with the tiles icon; `web/js/rulesmaker.js`, `web/js/ruleslearn.js`, `rulesmaker.py`): make your own automapper .rules without writing them. The rules design map has one section per kind (Hook, Freeze, Unhook, Hookthrough), each with every neighbourhood a rule needs (all 47 "blob" cases in air, slopes, thin parts, freeze rings, the kind next to the other kinds), and a test cave at the bottom. Each kind has its own tile layer (1 layer = 1 kind = 1 config; the kind comes from the first word of the layer name, so "Hook 2" is a second hook layer). Pick the tileset per layer (DDNet mapres, or the editor's own from `extra-data/mapres`, which are embedded), then paint the section on the cells and around them; "Fill" puts the brush on every empty cell of the kind, "Start from…" draws the section with an existing config to change, "Mirror" fills unpainted cases from rotated/flipped painted ones (for freeze). Generate writes one config per layer (one file per tileset) and draws the test cave with it; the Game layer in the test cave can be changed to try other shapes. "Download .rules" saves the files, "Use in editor" keeps them in `user-rules/` (the editor adds them to the tileset's .rules, so they show up in every layer's automapper), "Copy to DDNet" adds them to DDNet's own `editor/automap` folder (the standard configs stay). Different tiles painted in the same situation become random variants (shown as "random spots" with a link). The learning is the same as `tools/template2rules.py` (the JS port gives the same rules).
-- **Learned styles** in Design it! (`styles/<name>/`, made by `tools/tilestyle.py`): a style is learned from a finished, hand-designed map. Every game cell is air, wall (hook, unhook, hookthrough) or freeze. For each air and freeze cell the script reads the 3x3 around it plus the four cells two steps away straight up, down, left and right, and remembers the whole stack of freeze tiles there (the freeze layer and its decoration layers together, so an edge tile and the decoration on it always come as a pair). A second look adds the stacks already chosen on the four sides, so notches in neighbouring freeze tiles always meet. A situation the map never had is taken from the same situation turned or mirrored; where the mapper did one situation in several ways, the most used way wins. Hook is plain tile 73, unturned, on hook and unhook. Glow outlines run from a .rules file in the editor (`rules`: config and mask solid / through / not solid / not through). Learn a new one: `python tools/tilestyle.py learn designed.map styles/<name> [--spec spec.json]` (without a spec the freeze and hook layers are found by where their tiles sit; add a `card.png` for the gallery, 11:10).
-- Quads: select, box select, drag (Shift keeps the move on one axis, also for corners), corner points, pivot (Ctrl), corner colours, texture coordinates, position and colour envelopes, square, align, image aspect ratio, rotate, flip, copy/paste/duplicate, order, knife.
-- Colour palette (pinned at the top of the right panel, kept in the browser, at most two rows). A fresh palette holds five standard colours (#F5E9E2, #E3B5A4, #D44D5C, #773344, #160029). Every copied colour is added on its own: the pipette (Ctrl+Shift+C), Shift+right click on a colour field, Ctrl+C of a hex code in a text field. + saves the colours of the selection (a quad whose corners differ is saved as a gradient of its four corner colours; selected corners, the tile layer colour or the last pipette colour also work). New swatches go to the end; when the rows are full the oldest added swatch makes room (the standard colours stay until removed by hand). A click puts a swatch on the selected quads or corners (a gradient goes corner by corner), on a tile layer's colour, or into an open colour picker. Drag a swatch to move it (Esc or dropping it outside the palette cancels). Right click: apply, copy as hex, remove, restore standard colours (also on the palette title). Palette changes are undone with Ctrl+Z like map edits, but never mark the map unsaved.
-- Several tile layers at once: Ctrl/Shift+click tile layers of the selected group in the layer list. Box select, brush, fill, flood fill and right-drag erase then work in all of them in one undo step; a brush copied from several layers puts each part back into its own layer.
-- Timeline (dock button with the keys icon, or K): keyframe animation of quads, stored as normal DDNet envelopes so the map stays fully compatible. Select quads, put the playhead (click the ruler) where the animation starts and press K: keys for position, rotation and colour are set (quads without envelopes get one position and one colour envelope, shared by the quads keyed together). Move the playhead, move or turn (R) the quads in the map (shown in orange until keyed, with the motion path drawn) and press K again. In the timeline keys can be dragged in time (snap 10 ms, Ctrl 100 ms, Alt 1 ms), box or Shift selected, deleted (Delete), given a curve (Step, Linear, Slow, Fast, Smooth), edited by value, and added in place with a double click. Esc or closing the timeline drops unkeyed moves.
-- Scale: hold S with quads selected and move the mouse right to grow, left to shrink (one quad scales from its pivot, several from the middle of their bounding box; Shift fine, Ctrl steps of 10%, click or release S applies, Esc/right click cancels).
-- Concave quads: DDNet splits a quad into two triangles along TL-BR, so a quad whose inward corner is TR or BL would be filled outside its outline. When a vertex drag or the quad pen makes such a quad, its corners are renamed one step around the outline (colours and texture follow), and the fill stays inside.
-- Rotation: hold R with quads selected and move the mouse to rotate freely (Shift fine, Ctrl snaps to the step, click or release R applies, Esc/right click cancels). The step field in the toolbar sets the degrees for Shift+R and T.
-- **Quad pen** (D or the Pen button, on a quads layer): click points to draw a stroke made of quads, click+drag for a curve point. Every straight segment is one quad, curved segments are cut into trapezoids by "Subdivisions" (per path, or per point: Shift+click selects a range of points). Alt+drag moves one handle on its own, Alt+click removes it (a sharp corner on one side only). Click the first point while drawing (or Shift+click an end of the path, or the Close button) to close the path. Stroke width, colour and subdivisions in the right panel (the last values are kept for the next path, also after a reload); sharp corners get a bevel quad. The quads are ordinary DDNet quads; the editable paths are kept only in the browser, never in the .map file. "Fill" is experimental (`web/js/pen-fill.js`, switch in `web/js/features.js`): it closes the path and moves the inner corners of its quads into the shape so they cover the inside, without extra quads (the shape is split into star-shaped parts and each part's corners meet at one point; where two parts of the outline come closer than the stroke width they are merged, like the plain stroke shows them).
-- Quad brush: the Brush button or B grabs the selected quads, Shift+drag a box grabs the quads inside it; click or drag to stamp copies, right click or Esc drops the brush.
-- Sound layers and sources (circle and rectangle shapes, falloff, loop, pan, delay, envelopes).
-- Images: embedded PNG (JPG, WEBP, GIF, BMP are converted to PNG automatically), drag and drop image files onto the window or straight onto the map (a dropped image also gets its own quads layer with a quad at the drop point), external from mapres, replace, rename, embed/make external, export, delete unused.
-- Envelopes: colour, position, sound; graph with draggable points, curves, synchronization. Animation preview (▶).
-- Sounds (.opus), server settings, map details, history with jump to any step, "Append from another map".
-- View: grid, proof (game screen frame), parallax, parallax zoom, entities opacity, focus on layer, tile info (Ctrl+I).
-- Right-click menus like in the DDNet editor: groups, layers (with all their properties), visibility eyes (show only this one within its list; Shift+click on a group eye hides all other groups, on a layer eye all other layers of the map, and Shift+click again brings back what was visible before), quads, quad corners, sound sources, images, sounds, envelope points and curves, Grid / Proof / Play buttons. Shift+right click deletes a quad, Ctrl+right click on the map selects the tile layer under the mouse, Shift+right/left click on a colour copies/pastes it. Colours are one field that takes hex (`#RRGGBB`, `#RRGGBBAA`, `F80`), `r g b [a]` or `rgb(...)` and applies on Enter.
-- Hotkeys follow the physical key, so they also work with a Russian or any other keyboard layout.
-- Interface: the map fills the whole window and the panels float over it as islands (solid dark gradient with a drop shadow, no blur, so a busy map stays fast); the bottom panel opens from the buttons next to the zoom in the bottom right corner; the properties panel on the right is optional (P or the gear button) and holds only the tools (brush, quads and their selection, sound sources, quad pen), as tall as its content; layer and group settings are in their right-click menus in the layer list; resizable (drag the edges, double click resets), collapsible property cards, Discord-like dark theme in Helvetica (Arial on Windows) with toggles instead of checkboxes, one button height and lists that open a small window with mini previews (images as tiles, envelopes, curve types, colours), short help behind the "i" marks next to the labels, layers and groups reordered by dragging in the layer list, every number field can be dragged left/right (Shift fine, Ctrl coarse, one undo step per drag). Box selection of quads works on top of other quads; with several quads selected, Colour changes all of them.
-- **Quad art**: image → layers of coloured quads (modes: colour, flat colours, negative, lines only; "Fewer quads" = `--optimize`). Inserted as a new group before Game or into the selected group. The window has a drop zone for the picture, the settings on the left and the image and quads side by side.
-- **Tile art**: image → tile layers, one pixel per tile.
+[Quick start](#quick-start) · [Highlights](#highlights) · [Everything it can do](#everything-it-can-do) · [Shortcuts](#shortcuts) · [Modules](#modules) · [For developers](#for-developers)
 
-Shortcuts: F1 in the editor.
+</div>
 
-## Modules (optional features)
-The core editor (open / save .map, groups and layers, tiles and physics layers, quads, sounds, envelopes, images, automapper, undo, session restore) works on its own. Every extra feature is a module: one file in `web/js/` with a `setup(ed)` function, listed in `web/js/features.js`. To remove one, delete its line in `features.js` (or delete its file: a missing file is skipped with a note in the browser console, the rest keeps working). Its buttons and menu entries in `index.html` carry `data-feature="<id>"` and disappear on their own; the leftover markup can be deleted too but does not have to be.
+---
 
-| id | What | Files to delete | Server side (optional too) |
+## Quick start
+
+### Portable (nothing to install)
+
+1. Download `tw-editor-<version>-win64.zip` from [Releases](../../releases) and unpack it anywhere.
+2. Double-click **`start.bat`**. Python and every module are already inside (`runtime\`).
+3. The editor opens in your browser at `http://localhost:8765`.
+
+The portable build updates itself: on every start it checks the latest release and downloads only the changed code
+(1 to 2 MB). The large runtime is downloaded again only when the Python modules change. Your settings, rules and the
+local test server are never touched. Turn updates off with `"auto_update": false` in `config.json` or `start.bat --no-update`.
+
+### From source
+
+1. Install [Python 3](https://www.python.org/downloads/) and tick **"Add python.exe to PATH"**.
+2. Clone or download this repository and double-click **`start.bat`**.
+   The first start installs the quad art modules (numpy, pillow, opencv, mapbox-earcut, scipy).
+3. Or run it by hand: `python editor.py` (`--port 9000`, `--no-browser`, `--keep-running`).
+
+> **Use Chrome or Edge.** There Ctrl+S writes straight back into the opened `.map` file. Firefox downloads the map instead.
+
+The editor finds your DDNet installation by itself (Steam too) and takes the standard mapres, entities and automapper
+rules from it. Without DDNet installed they are downloaded once from DDNet's GitHub into `cache/`. Another game folder
+can be set in **Edit → Editor settings**.
+
+If port 8765 is taken, the editor picks the next free one and remembers it, so the address (and with it the browser's
+palette and autosave) stays the same every time. Closing the last editor tab stops the editor about 8 seconds later.
+
+---
+
+## Highlights
+
+### ✨ Design it!: a finished map look in one click
+
+Right click the **Game** layer and press **Design it!**. The editor draws your whole map with real tilesets: one
+automapped layer for every kind of tile, in a new **Design** group right above Game. The preview shows *your own map*
+around the spawn, so you see the result before you apply it.
+
+| Grass meadow | Generic stones | Amazing Flat |
+|:---:|:---:|:---:|
+| <img src="web/presets/meadow_obsidian.png" width="260"> | <img src="web/presets/generic_stones.png" width="260"> | <img src="web/presets/amazing_flat.png" width="260"> |
+| `meadow_obsidian` ground with a grass edge, stones for thin parts and unhook | `Stones07_GreyMix_Sharp` for everything solid, unhook in steel blue | Flat `amazing_freeze` blocks with soft corners everywhere |
+
+![Design it! window](docs/screenshots/design-it.png)
+
+- **Presets** on the left fill in every setting. **Customize** on the right changes anything per kind: tileset, style,
+  extra passes (grass, dirt, deco, blocks, randomize, corner styles) and colours (click a swatch).
+- Kinds it draws, bottom to top: **Freeze** (alpha 100, under everything), **Unfreeze**, **Death**, **Tune**, **Tele**,
+  **Hook**, **Thin hook**, **Unhook**, **Hookthrough**. Only kinds that exist on your map get a layer; each kind can be switched off.
+- **Thin hook**: `meadow_obsidian` cannot draw 1 tile thick walls, so a stones layer fills exactly those spots.
+- **Hookthrough** (unhook + tile 66 in Front) gets its own layer on top.
+- Unfreeze, tele and tune use the freeze tileset, tinted green, blue and purple; death is plain red.
+- Tilesets that are not part of DDNet (`amazing_freeze`, `meadow_obsidian`, `Stones07_GreyMix_Sharp`) ship in
+  `extra-data/` and are **embedded into the map**, so it works on any server.
+- One undo step. Every layer keeps its automapper config and seed, so it can be re-run from the layer menu after you edit the map.
+- If a Design group already exists, you choose **Replace** or **Add another**.
+
+<details>
+<summary>The other two presets on the same map</summary>
+
+![Generic stones](docs/screenshots/design-it-stones.png)
+![Amazing Flat](docs/screenshots/design-it-flat.png)
+
+</details>
+
+### ⚡ Fast automapper
+
+A full port of DDNet's `auto_map.cpp` with the same results (same random variants for the same seed), made much faster:
+each rule is compiled once into lookup tables, and only the rules that can match an empty or a filled cell are tried.
+Configs, seeds, reference layers and **automatic mode** (re-run while you paint) are supported. Your own `.rules`
+files from the rules maker are added to the tileset's list in every layer.
+
+### 🧩 Rules maker: make your own `.rules` without writing them *(experimental)*
+
+![Rules maker](docs/screenshots/rules-maker.png)
+
+Paint how your tileset should look and get a ready automapper config. The rules design map has one section per kind
+(Hook, Freeze, Unhook, Hookthrough) with every neighbourhood a rule needs: all 47 "blob" cases, slopes, thin parts,
+freeze rings, a kind next to another kind. Paint the cells, press **Generate**, and the test cave at the bottom is drawn
+with your new rules.
+
+- One tile layer = one kind = one config ("Hook 2" is a second hook config).
+- **Fill** puts the brush on every empty cell, **Start from…** loads an existing config to change, **Mirror** fills
+  unpainted cases from rotated or flipped painted ones.
+- Different tiles painted in the same situation become **random variants**.
+- **Download .rules**, **Use in editor** (kept in `user-rules/`), or **Copy to DDNet** (into DDNet's own `editor/automap`).
+- The same learning works from the command line: `tools/template2rules.py` with `templates/rules_template.map`.
+
+The rules maker is switched off for now and is not shipped in the portable build. In a source checkout, turn it on by uncommenting its line in `web/js/features.js`.
+
+![Rules maker test cave](docs/screenshots/rules-maker-test.png)
+
+### 🎨 Quad art from an image
+
+![Quad art](docs/screenshots/quad-art.png)
+
+Drop a picture and get it as **coloured quads**, one layer per colour. The converter (`img2quads.py`) quantizes the image,
+cleans JPEG noise, traces the outlines with holes, triangulates them and pairs the triangles into quads, so there are no seams.
+
+- Modes: **Colour**, **Flat colours** (pixel art and prepared pictures), **Negative** (ink drawing as light lines on
+  a dark background), **Lines only**.
+- **Fewer quads** merges what can be merged.
+- Inserted as a new group before Game, or into the selected group. Image and quads are shown side by side.
+- Also available as a command line tool: `python img2quads.py picture.png out.map --preview out.png`.
+
+**Tile art** does the same with tiles: one pixel = one tile.
+
+### ✏️ Quad pen
+
+![Quad pen](docs/screenshots/quad-pen.png)
+
+Press **D** on a quads layer and draw strokes like in a vector editor: click for points, drag for curves. Every straight
+segment is one quad, curves are cut into trapezoids (subdivisions per path or per point). Sharp corners get a bevel quad;
+**Alt** moves or removes a single handle; click the first point to close the path. Width, colour and subdivisions live in
+the right panel and are remembered.
+
+**Fill** *(experimental)* closes the path and moves the inner corners of its quads into the shape, so the inside is
+covered without a single extra quad:
+
+![Quad pen fill](docs/screenshots/quad-pen-fill.png)
+
+### 🎬 Timeline: animate quads with keys
+
+![Timeline](docs/screenshots/timeline.png)
+
+Press **K** with quads selected to key their position, rotation and colour at the playhead. Move the playhead, move or
+turn the quads (shown in orange until keyed, with the motion path drawn) and press **K** again. Keys can be dragged,
+box-selected, deleted, given a curve (Step, Linear, Slow, Fast, Smooth) or typed in. Everything is stored as normal
+DDNet envelopes, so the map stays 100% compatible.
+
+### 🧪 Test the map in one click
+
+![Test map](docs/screenshots/test-map.png)
+
+**Test** starts the editor's own DDNet server with your map. Connect from your client (`localhost:8303`, it also shows
+in the Local tab). Every Ctrl+S sends the map with `hot_reload`, so tees stay where they are. The server is downloaded
+once and ignores your own DDNet config, votes and maps.
+
+### ❄️ Gores mode
+
+Press **G** and paint: every hookable tile gets a freeze ring around it, erasing hook removes the freeze it placed, and
+carving air through a hook wall turns the touched hook into freeze. Only tiles next to your edit change, and freeze you
+placed by hand is never removed.
+
+---
+
+## Everything it can do
+
+<details open>
+<summary><b>Maps and files</b></summary>
+
+- Opens and saves DDNet `.map` files completely: envelopes with bezier curves, automapper settings and unknown UUID items are kept.
+- **Own Open / Save window** that reaches `%APPDATA%\DDNet\maps` (the browser's dialog refuses AppData), with DDNet maps
+  one click away, recent files, and Ctrl+S writing back to the same file anywhere on the computer.
+  **Browser dialog…** still opens the browser's own.
+- **Session restore**: the last map, its unsaved changes, the view and the open tab come back after a page reload.
+- History with a jump to any step, **Append from another map**, server settings, map details, sounds (`.opus`).
+- Images: embedded PNG (JPG, WEBP, GIF, BMP are converted automatically), drag and drop files onto the window or
+  straight onto the map (a dropped image gets its own quads layer), external mapres, replace, rename, embed / make external,
+  export, delete unused. The layer image picker shows a searchable grid of previews.
+- A spinner in the status bar shows what is running (opening, saving, test server, quad art).
+
+![Open window](docs/screenshots/file-dialog.png)
+
+</details>
+
+<details>
+<summary><b>Tiles and physics layers</b></summary>
+
+- Tile, Game, Front, Tele, Speedup, Switch and Tune layers drawn with the DDNet editor's pictures, with tele / switch / tune
+  numbers and speedup arrows at their angle.
+- Tile picker while **Space** is held (or pinned open with the Tile picker button), brush from a selection, flip and rotate
+  the brush (N, M, R, T), rectangle fill (Shift), flood fill (Ctrl+Shift), destructive mode, DDNet tile validity rules.
+- **Several tile layers at once**: Ctrl/Shift+click layers in the list; select, brush, fill and erase then work in all
+  of them in one undo step.
+- **Resize with an anchor**: a 3x3 anchor picks the sides to grow on, everything built stays in place, all physics layers
+  resize together, quads, sound sources and parallax offsets move with it. **Linked** also resizes every lined-up tile
+  layer of the same size; a dashed frame previews the new size.
+- Border, construct and clean up game tiles.
+
+![Tile picker](docs/screenshots/tile-picker.png)
+![Resize with preview](docs/screenshots/resize.png)
+
+</details>
+
+<details>
+<summary><b>Quads</b></summary>
+
+- Select, box select (also on top of other quads), drag (Shift locks the axis), corner points, pivot (Ctrl), corner colours,
+  texture coordinates, position and colour envelopes, square, align, image aspect ratio, flip, copy / paste / duplicate, order, knife.
+- **Rotate** (hold R and move the mouse) and **scale** (hold S) with Shift for fine and Ctrl for steps; Esc cancels.
+- **Quad brush** (B): grab quads and stamp copies with clicks or drags.
+- **Concave quads stay correct**: DDNet splits a quad along TL-BR, so some concave quads would fill outside their outline.
+  The editor renames the corners so the fill always stays inside.
+- **Grid snapping** with finer grids as you zoom in (half, quarter… of a tile, down to 1 unit).
+
+<img src="docs/screenshots/concave.png" width="260">
+
+</details>
+
+<details>
+<summary><b>Colours and palette</b></summary>
+
+- A **colour palette** at the top of the right panel, kept in the browser. Every colour you copy lands there: the pipette
+  (Ctrl+Shift+C), Shift+right click on a colour, Ctrl+C of a hex code. **+** saves the colours of the selection, and a quad
+  with different corners is saved as a **gradient** that is applied corner by corner.
+- Drag swatches to reorder, right click to copy as hex or remove. Palette changes are undoable but never mark the map unsaved.
+- Every colour field takes `#RRGGBB`, `#RRGGBBAA`, `F80`, `r g b [a]` or `rgb(...)`. Own colour picker window.
+
+<img src="docs/screenshots/palette.png" width="320">
+
+</details>
+
+<details>
+<summary><b>Envelopes, sounds and view</b></summary>
+
+- Envelopes: colour, position and sound, a graph with draggable points and curves, synchronization, animation preview (▶).
+- Sound layers and sources: circle and rectangle shapes, falloff, loop, pan, delay, envelopes.
+- View: grid, proof (game screen frame), parallax and parallax zoom, clipping, entities opacity, focus on a layer, tile info (Ctrl+I).
+
+</details>
+
+<details>
+<summary><b>Interface</b></summary>
+
+- The map fills the whole window and the panels float over it as islands. Discord-like dark theme, solid panels with no
+  blur, so even a busy map stays fast.
+- Right-click menus like in the DDNet editor for groups, layers, eyes, quads, corners, sound sources, images, sounds and
+  envelope points. Layer and group settings live in their right-click menus; the properties panel (P) holds only the tools.
+- Shift+click a group or layer eye to see only it; Shift+click again brings everything back.
+- Every number field can be dragged left / right (Shift fine, Ctrl coarse), one undo step per drag.
+- Resizable, collapsible panels, short help behind every "i" mark, layers and groups reordered by dragging.
+- Hotkeys follow the physical key, so they work with a Russian or any other keyboard layout.
+
+</details>
+
+<details>
+<summary><b>Learned styles (command line)</b></summary>
+
+`tools/tilestyle.py` learns a tile style from a finished, hand-designed map: for every air and freeze cell it remembers
+the stack of freeze and decoration tiles used in that neighbourhood, so a new map can be decorated the same way.
+
+```
+python tools/tilestyle.py learn designed.map styles/<name> [--spec spec.json]
+```
+
+Learned styles are kept in `styles/<name>/`; the editor server lists them at `/api/styles`.
+
+</details>
+
+---
+
+## Shortcuts
+
+Press **F1** in the editor for the full list. The most used ones:
+
+| Key | Action | Key | Action |
 |---|---|---|---|
-| `palette` | colour palette in the right panel | `web/js/palette.js` | |
-| `colorpicker` | own colour window (without it the browser's colour dialog opens) | `web/js/colorpicker.js` | |
-| `tilenumbers` | tele / switch / tune numbers and speedup arrows on the map | `web/js/tilenumbers.js` | |
-| `gores` | Gores mode (G) | `web/js/gores.js` | |
-| `pen` | quad pen (D); "Fill" is `web/js/pen-fill.js` on its own | `web/js/pen.js`, `web/js/pen-fill.js` | |
-| `timeline` | timeline with keys (K) | `web/js/timeline.js` | |
-| `design` | Design it! | `web/js/design.js`, `web/presets/` | `styles/`, `tools/tilestyle.py`, `tools/template2rules.*`, `templates/`, `extra-data/` (amazing_freeze) |
-| `rulesmaker` | Rules maker (paint a design, get .rules) | `web/js/rulesmaker.js`, `web/js/ruleslearn.js` | `rulesmaker.py`, `user-rules/` |
-| `quadart` | Quad art from image | `web/js/quadart.js` | `quadart.py`, `img2quads.py` |
-| `tileart` | Tile art from image | `web/js/tileart.js` | |
-| `testmap` | Test map on a local server | `web/js/testmap.js` | `testserver.py`, the `ddnet-server/` folder |
+| Space (hold) | Tile picker | Ctrl+S | Save into the same file |
+| N / M | Flip brush or quads | Ctrl+Z / Ctrl+Y | Undo / Redo |
+| R / T | Rotate (hold R to rotate freely) | Ctrl+O | Open |
+| S (hold) | Scale selected quads | Ctrl+G / Ctrl+P | Grid / Proof |
+| B | Quad brush | Ctrl+I | Tile info |
+| D | Quad pen | Ctrl+Shift+C | Pipette |
+| G | Gores mode | P | Properties panel |
+| K | Key quads on the timeline | Home | Camera to the layer |
 
-`editor.py` starts without `testserver.py`, `quadart.py`, `img2quads.py`, `rulesmaker.py` and `tools/tilestyle.py`; their endpoints then answer with a short error instead. A new module plugs in through the hook lists in `ed.ext` (see the comment in the Editor constructor, `web/js/editor.js`): commands, keys, overlays, tile edits, bottom tabs, layer sheet buttons, save targets; editor-only layer data goes through `registerLayerExtra` (undo, `history.js`) and `registerSessionExtra` (session backup, `session.js`).
+---
 
-## Files
-- `editor.py` server, `quadart.py` and `img2quads.py` converter, `web/` the editor itself (`js/main.js` start-up and modules, `js/map.js` map format, `js/render.js` WebGL, `js/editor.js` tools, `js/panels.js` panels, `js/features.js` the list of modules).
-- **Busy indicator**: while a map opens or saves, the test server starts or reloads, or any request to the editor server takes a moment, the status bar shows a spinner with what is running.
-- **Open** (File → Open…, Ctrl+O) uses the browser's plain file input, which opens the usual Windows dialog in any folder, DDNet's `%APPDATA%\DDNet\maps` included (paste `%appdata%\DDNet\maps` into the dialog's address bar once; Chrome remembers the folder). Chrome's newer File System Access picker is not used for opening because it refuses AppData ("contains system files"). Such a file is read only: the first Ctrl+S asks where to save (Save as dialog, or a download in browsers without it), later Ctrl+S writes there.
-- **Test map** (button on the top bar, right click for the menu): the editor keeps its own DDNet in `ddnet-server/` (the latest release is downloaded from GitHub or ddnet.org the first time `editor.py` / `start.bat` runs), writes the map to its `data/maps/tw_editor_test.map` and starts its `DDNet-Server` with it (a server path set in Editor settings wins); connect to the shown address (usually `localhost:8303`) from your DDNet client. After that every save by hand (Ctrl+S, Save as) sends the map with `hot_reload` through the external console, so the tees stay where they are; edits alone are not sent (can be turned off in the menu; "Reload map now" sends it by hand). The test server ignores the player's own DDNet folder (its autoexec_server.cfg, votes and maps) and listens on all addresses, so it shows up in the client's Local tab. The client itself is never started. Code: `testserver.py`, `web/js/testmap.js`.
-- Grid snapping: with the grid on, quads (the corner nearest to where you grab), quad points, pen points, pasted quads and sound sources snap to the finest grid drawn; zooming in draws a finer grid (half, quarter… of a tile, down to 1 unit) and allows finer placement.
+## Modules
+
+The core editor (open and save, groups and layers, tiles, quads, sounds, envelopes, images, automapper, undo, session
+restore) works on its own. Every extra feature is a **module**: one file in `web/js/` with a `setup(ed)` function, listed
+in [`web/js/features.js`](web/js/features.js). Delete its line (or its file) and its buttons disappear; the rest keeps working.
+
+| id | What | Files | Server side |
+|---|---|---|---|
+| `palette` | Colour palette | `palette.js` | |
+| `colorpicker` | Own colour picker window | `colorpicker.js` | |
+| `tilenumbers` | Tele / switch / tune numbers, speedup arrows | `tilenumbers.js` | |
+| `gores` | Gores mode (G) | `gores.js` | |
+| `pen` | Quad pen (D) and its Fill | `pen.js`, `pen-fill.js` | |
+| `timeline` | Timeline with keys (K) | `timeline.js` | |
+| `design` | Design it! | `design.js`, `web/presets/` | `extra-data/`, `styles/`, `tools/tilestyle.py` |
+| `rulesmaker` | Rules maker *(off by default)* | `rulesmaker.js`, `ruleslearn.js` | `rulesmaker.py`, `templates/`, `user-rules/` |
+| `quadart` | Quad art from an image | `quadart.js` | `quadart.py`, `img2quads.py` |
+| `tileart` | Tile art from an image | `tileart.js` | |
+| `filedialog` | Own Open / Save window | `filedialog.js` | `filebrowser.py` |
+| `testmap` | Test map on a local server | `testmap.js` | `testserver.py`, `ddnet-server/` |
+
+`editor.py` also starts without the optional Python files; their endpoints then answer with a short error. A new module
+plugs in through the hook lists in `ed.ext` (see the Editor constructor in `web/js/editor.js`): commands, keys, overlays,
+tile edits, bottom tabs, layer menu buttons and save targets.
+
+---
+
+## For developers
+
+```
+editor.py          local server: serves web/, DDNet data, quad art, rules, file browser
+web/               the editor itself (plain ES modules, no build step)
+  js/main.js       start-up and modules        js/map.js        .map format
+  js/render.js     WebGL renderer              js/editor.js     tools
+  js/panels.js     panels                      js/automapper.js DDNet automapper
+extra-data/        tilesets and .rules that are not part of DDNet
+tools/             command line tools (tilestyle, template2rules, twmap)
+portable/build.py  builds the portable Windows zip
+update.py          self-update of the portable build
+```
+
+**Making a release**: push a tag like `v1.0.0` (or run *Actions → Release* by hand). The workflow builds the portable
+zip, the code-only zip for updates and `version.json`, and publishes them as a GitHub release. The Python runtime gets
+its own release and is rebuilt only when `portable/requirements.txt` or the Python version change.
+
+---
+
+<div align="center">
+
+Made for the DDNet community. Maps made with TW Editor are plain DDNet maps and open in the official editor.
+
+</div>
