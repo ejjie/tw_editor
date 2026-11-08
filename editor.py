@@ -21,7 +21,6 @@ gets a clear error from its endpoint.
   quadart.py + img2quads.py   Quad art            /api/quadart
   tools/tilestyle.py, styles/ learned styles      /api/styles, /api/style, /styles/...
   (in this file)              DDNet maps folder   /api/maps, /api/maps/file
-  rulesmaker.py               Rules maker         /api/rules/tilesets, /api/rules/user, /api/rules/ddnet, user-rules/
 
 When the last editor tab is closed, the editor stops by itself together with the test server
 (--keep-running turns that off).
@@ -188,7 +187,6 @@ def optional(name):
         raise
 
 
-RULESMAKER = optional("rulesmaker")  # Rules maker (web/js/rulesmaker.js); the editor runs without it
 FILES = optional("filebrowser")  # the editor's own Open / Save window (web/js/filedialog.js); any folder, AppData too
 
 
@@ -288,16 +286,6 @@ class Handler(SimpleHTTPRequestHandler):
             f = f if STYLES.resolve() in f.parents and f.is_file() and f.suffix.lower() in (".png", ".json") else None
         elif path.startswith("/mapres/"):
             f = data_file("mapres/" + path[len("/mapres/"):])
-        elif path.startswith("/data/editor/automap/") and path.endswith(".rules") and RULESMAKER and \
-                (text := RULESMAKER.rules_file(sys.modules[__name__], path[len("/data/editor/automap/"):-len(".rules")])) is not None:
-            body = text.encode("utf-8")  # DDNet's file + the configs made in the Rules maker
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            if not head:
-                self.wfile.write(body)
-            return True
         elif path.startswith("/data/"):
             f = data_file(path[len("/data/"):])
         else:
@@ -359,13 +347,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/rules":
             d = find_ddnet_data()
             names = sorted(p.stem for p in (d / "editor" / "automap").glob("*.rules")) if d and (d / "editor" / "automap").is_dir() else STANDARD_RULES
-            if RULESMAKER:
-                names = sorted(set(names) | RULESMAKER.user_names(sys.modules[__name__]))
             return self.send_json(names)
-        if path == "/api/rules/tilesets":
-            if not RULESMAKER:
-                return self.send_json({"error": "Rules maker is not installed: rulesmaker.py was removed"}, 404)
-            return self.send_json(RULESMAKER.tilesets(sys.modules[__name__]))
         if path == "/api/styles":
             return self.send_json(style_list())
         if path == "/api/config":
@@ -476,10 +458,6 @@ class Handler(SimpleHTTPRequestHandler):
             save_config(cfg)
             d = find_ddnet_data()
             return self.send_json({"found": bool(d), "using": str(d) if d else ""})
-        if path in ("/api/rules/user", "/api/rules/ddnet"):
-            if not RULESMAKER:
-                return self.send_json({"error": "Rules maker is not installed: rulesmaker.py was removed"}, 404)
-            return self.send_json(*RULESMAKER.post(sys.modules[__name__], path, req))
         if path == "/api/quadart":
             try:
                 import quadart

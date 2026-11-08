@@ -12,7 +12,6 @@ export const MODULES = [
   { id: 'pen', file: './pen.js' },                 // quad pen (D)
   { id: 'timeline', file: './timeline.js' },       // timeline with keys (K)
   { id: 'design', file: './design.js' },           // Design it! (right click on the Game layer)
-  // { id: 'rulesmaker', file: './rulesmaker.js' }, // Rules maker (paused; uncomment to turn on): paint a design, get a .rules file (uses ruleslearn.js)
   { id: 'quadart', file: './quadart.js' },         // Quad art from image (needs quadart.py + img2quads.py)
   { id: 'tileart', file: './tileart.js' },         // Tile art from image
   { id: 'filedialog', file: './filedialog.js' },   // own Open / Save window that reaches AppData (needs filebrowser.py)

@@ -85,28 +85,7 @@ around the spawn, so you see the result before you apply it.
 
 A full port of DDNet's `auto_map.cpp` with the same results (same random variants for the same seed), made much faster:
 each rule is compiled once into lookup tables, and only the rules that can match an empty or a filled cell are tried.
-Configs, seeds, reference layers and **automatic mode** (re-run while you paint) are supported. Your own `.rules`
-files from the rules maker are added to the tileset's list in every layer.
-
-### 🧩 Rules maker: make your own `.rules` without writing them *(experimental)*
-
-![Rules maker](docs/screenshots/rules-maker.png)
-
-Paint how your tileset should look and get a ready automapper config. The rules design map has one section per kind
-(Hook, Freeze, Unhook, Hookthrough) with every neighbourhood a rule needs: all 47 "blob" cases, slopes, thin parts,
-freeze rings, a kind next to another kind. Paint the cells, press **Generate**, and the test cave at the bottom is drawn
-with your new rules.
-
-- One tile layer = one kind = one config ("Hook 2" is a second hook config).
-- **Fill** puts the brush on every empty cell, **Start from…** loads an existing config to change, **Mirror** fills
-  unpainted cases from rotated or flipped painted ones.
-- Different tiles painted in the same situation become **random variants**.
-- **Download .rules**, **Use in editor** (kept in `user-rules/`), or **Copy to DDNet** (into DDNet's own `editor/automap`).
-- The same learning works from the command line: `tools/template2rules.py` with `templates/rules_template.map`.
-
-The rules maker is switched off for now and is not shipped in the portable build. In a source checkout, turn it on by uncommenting its line in `web/js/features.js`.
-
-![Rules maker test cave](docs/screenshots/rules-maker-test.png)
+Configs, seeds, reference layers and **automatic mode** (re-run while you paint) are supported.
 
 ### 🎨 Quad art from an image
 
@@ -300,7 +279,6 @@ in [`web/js/features.js`](web/js/features.js). Delete its line (or its file) and
 | `pen` | Quad pen (D) and its Fill | `pen.js`, `pen-fill.js` | |
 | `timeline` | Timeline with keys (K) | `timeline.js` | |
 | `design` | Design it! | `design.js`, `web/presets/` | `extra-data/`, `styles/`, `tools/tilestyle.py` |
-| `rulesmaker` | Rules maker *(off by default)* | `rulesmaker.js`, `ruleslearn.js` | `rulesmaker.py`, `templates/`, `user-rules/` |
 | `quadart` | Quad art from an image | `quadart.js` | `quadart.py`, `img2quads.py` |
 | `tileart` | Tile art from an image | `tileart.js` | |
 | `filedialog` | Own Open / Save window | `filedialog.js` | `filebrowser.py` |
@@ -321,7 +299,7 @@ web/               the editor itself (plain ES modules, no build step)
   js/render.js     WebGL renderer              js/editor.js     tools
   js/panels.js     panels                      js/automapper.js DDNet automapper
 extra-data/        tilesets and .rules that are not part of DDNet
-tools/             command line tools (tilestyle, template2rules, twmap)
+tools/             command line tools (tilestyle, twmap)
 portable/build.py  builds the portable Windows zip
 update.py          self-update of the portable build
 ```

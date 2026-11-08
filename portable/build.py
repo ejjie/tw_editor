@@ -40,9 +40,6 @@ EXCLUDE = [
     "*.png",  # screenshots at the top; pictures in subfolders are listed in KEEP_PNG
     "docs/*",  # README screenshots
     "requirements.txt",  # pip modules for the development folder; the runtime has them
-    # Rules maker is paused (web/js/features.js): not shipped
-    "rulesmaker.py", "web/js/rulesmaker.js", "web/js/ruleslearn.js",
-    "templates/*", "tools/make_rules_template.py", "tools/template2rules.*",
 ]
 KEEP_PNG = ["web/*", "extra-data/*", "styles/*"]
 # Parts of the standard library the editor never uses (smaller runtime)
